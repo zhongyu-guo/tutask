@@ -28,7 +28,9 @@ export function wouldCreateCycle(goal, from, to) {
 export function isReady(goal, id) {
   const node = goal.nodes.find(n => n.id === id)
   if (!node || node.type === 'goal' || node.status !== 'todo') return false
-  return predecessorsOf(goal, id).every(p => p.status === 'done')
+  return predecessorsOf(goal, id)
+    .filter(p => p.type !== 'goal')
+    .every(p => p.status === 'done')
 }
 
 function computeHidden(goal, collapsedIds) {

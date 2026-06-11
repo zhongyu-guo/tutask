@@ -57,6 +57,12 @@ describe('isReady', () => {
     expect(isReady(goal, ids.C)).toBe(false) // X still todo
   })
 
+  it('ignores the goal root when computing readiness', () => {
+    const { goal, ids } = buildChain()
+    // A's only predecessor is root (type goal, never done) — still ready
+    expect(isReady(goal, ids.A)).toBe(true)
+  })
+
   it('node with no predecessors is ready, non-todo never ready', () => {
     let { goal, ids } = buildChain()
     expect(isReady(goal, ids.X)).toBe(true)
