@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "src", "-l", "4173"],
       "port": 4173
+    },
+    {
+      "name": "taskdag-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "dist", "-l", "4174"],
+      "port": 4174
     }
   ]
 }
