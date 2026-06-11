@@ -52,20 +52,22 @@ describe('computeLayers', () => {
   })
 })
 
-describe('autoLayout', () => {
-  it('positions layers left-to-right with stacked rows', () => {
+describe('autoLayout (outline tree style)', () => {
+  it('top-aligns each node with its first child; siblings stack below in the same column', () => {
     const { goal, ids } = buildDiamond()
     const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
+    // columns follow tree depth (D's primary parent is B — the first edge into it)
     expect(pos.get('root').x).toBe(0)
     expect(pos.get(ids.A).x).toBe(260)
     expect(pos.get(ids.B).x).toBe(520)
     expect(pos.get(ids.C).x).toBe(520)
     expect(pos.get(ids.D).x).toBe(780)
-    // B and C share a layer → distinct stacked y
-    expect(pos.get(ids.B).y).not.toBe(pos.get(ids.C).y)
-    // single-node layers are vertically centered relative to the two-node layer
-    const midBC = (pos.get(ids.B).y + pos.get(ids.C).y) / 2
-    expect(pos.get(ids.A).y).toBeCloseTo(midBC, 5)
+    // top alignment down the first-child chain: root = A = B = D
+    expect(pos.get(ids.A).y).toBe(pos.get('root').y)
+    expect(pos.get(ids.B).y).toBe(pos.get(ids.A).y)
+    expect(pos.get(ids.D).y).toBe(pos.get(ids.B).y)
+    // sibling C sits one row below B in the same column
+    expect(pos.get(ids.C).y).toBe(pos.get(ids.B).y + 90)
   })
 
   it('reserves extra height for open detail panels', () => {
@@ -77,6 +79,34 @@ describe('autoLayout', () => {
     const gapBase = base.get(ids.C).y - base.get(ids.B).y
     const gapDetail = withDetail.get(ids.C).y - withDetail.get(ids.B).y
     expect(gapDetail - gapBase).toBe(200)
+  })
+
+  it('a parent subtree pushes the next sibling below the whole subtree', () => {
+    // root → A → (B, C); root → E. E must clear A's entire subtree.
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'B', 'C', 'E']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, ids.A, ids.B)
+    goal = addEdge(goal, ids.A, ids.C)
+    goal = addEdge(goal, 'root', ids.E)
+    const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
+    expect(pos.get(ids.A).y).toBe(pos.get(ids.B).y)
+    expect(pos.get(ids.C).y).toBe(pos.get(ids.B).y + 90)
+    expect(pos.get(ids.E).y).toBe(pos.get(ids.C).y + 90) // below A's subtree
+    expect(pos.get(ids.E).x).toBe(260) // same column as A
+  })
+
+  it('places orphan nodes in column 1 below the root tree', () => {
+    let goal = createGoal('G')
+    goal = addNode(goal, { title: 'lone', type: 'task' })
+    const id = goal.nodes[1].id
+    const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
+    expect(pos.get(id).x).toBe(260)
+    expect(pos.get(id).y).toBeGreaterThan(pos.get('root').y)
   })
 })
 

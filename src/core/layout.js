@@ -32,56 +32,46 @@ export function computeLayers(goal, visibleIds) {
   return layers
 }
 
+// Outline-tree layout (mind-map style):
+// - each node is top-aligned with its first child
+// - siblings stack vertically in the same column (depth * gapX)
+// - a subtree pushes the next sibling below its full extent
+// The DAG is treed by "primary parent": the first visible edge into a node.
 export function autoLayout(goal, visibleIds, opts = {}) {
   const { gapX = 260, gapY = 90, detailHeights = {} } = opts
-  const layers = computeLayers(goal, visibleIds)
-
-  const byLayer = new Map()
-  for (const [id, layer] of layers) {
-    if (!byLayer.has(layer)) byLayer.set(layer, [])
-    byLayer.get(layer).push(id)
-  }
-  const layerNums = [...byLayer.keys()].sort((a, b) => a - b)
-
-  // barycenter ordering: sort each layer by mean predecessor row index, 2 passes
-  const rowIndex = new Map()
-  for (const layer of layerNums) {
-    byLayer.get(layer).forEach((id, i) => rowIndex.set(id, i))
-  }
-  for (let pass = 0; pass < 2; pass++) {
-    for (const layer of layerNums) {
-      const ids = byLayer.get(layer)
-      const keyed = ids.map(id => {
-        const preds = goal.edges
-          .filter(e => e.to === id && rowIndex.has(e.from))
-          .map(e => rowIndex.get(e.from))
-        const key = preds.length > 0
-          ? preds.reduce((a, b) => a + b, 0) / preds.length
-          : rowIndex.get(id)
-        return { id, key }
-      })
-      keyed.sort((a, b) => a.key - b.key)
-      byLayer.set(layer, keyed.map(k => k.id))
-      keyed.forEach((k, i) => rowIndex.set(k.id, i))
-    }
-  }
-
-  // assign y by stacking (detail panels take extra height), center each layer
   const pos = new Map()
-  const layerHeights = new Map()
-  for (const layer of layerNums) {
-    const ids = byLayer.get(layer)
-    let total = 0
-    for (const id of ids) total += gapY + (detailHeights[id] || 0)
-    layerHeights.set(layer, total)
+
+  const primaryParent = new Map()
+  for (const node of goal.nodes) {
+    if (!visibleIds.has(node.id)) continue
+    const first = goal.edges.find(e => e.to === node.id && visibleIds.has(e.from))
+    if (first) primaryParent.set(node.id, first.from)
   }
-  for (const layer of layerNums) {
-    const ids = byLayer.get(layer)
-    const height = layerHeights.get(layer)
-    let y = -height / 2
-    for (const id of ids) {
-      pos.set(id, { x: layer * gapX, y })
-      y += gapY + (detailHeights[id] || 0)
+  const treeChildren = id => goal.edges
+    .filter(e => e.from === id && visibleIds.has(e.to) && primaryParent.get(e.to) === id)
+    .map(e => e.to)
+
+  const cursor = { y: 0 }
+  function layoutSubtree(id, depth) {
+    const kids = treeChildren(id)
+    let y
+    if (kids.length === 0) {
+      y = cursor.y
+    } else {
+      for (const kid of kids) layoutSubtree(kid, depth + 1)
+      y = pos.get(kids[0]).y // top-align with first child
+    }
+    pos.set(id, { x: depth * gapX, y })
+    // next sibling must clear both the subtree and this node's own extent
+    cursor.y = Math.max(cursor.y, y + gapY + (detailHeights[id] || 0))
+  }
+
+  layoutSubtree('root', 0)
+  // orphans (no visible parent) become extra roots in column 1, below the tree
+  for (const node of goal.nodes) {
+    if (node.id === 'root' || !visibleIds.has(node.id)) continue
+    if (!primaryParent.has(node.id) && !pos.has(node.id)) {
+      layoutSubtree(node.id, 1)
     }
   }
   return pos
