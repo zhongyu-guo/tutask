@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task DAG — 依赖关系任务管理</title>
+<!-- BUILD:STYLE -->
+<link rel="stylesheet" href="styles.css">
+<!-- /BUILD:STYLE -->
+</head>
+<body>
+<div id="toolbar">
+  <input id="goalTitle" title="Goal 标题" placeholder="目标名称">
+  <div class="spacer"></div>
+  <button id="btnLayout" title="清除手动位置，重新自动排列">整理布局</button>
+  <button id="btnExport">导出 JSON</button>
+  <label class="btn" for="importFile">导入 JSON</label>
+  <input type="file" id="importFile" accept=".json,application/json">
+  <span id="zoomLabel">100%</span>
+  <button id="btnZoomReset" title="重置缩放与平移">重置视图</button>
+</div>
+<div id="storageWarning" class="warning-bar" hidden>
+  ⚠️ 本地存储不可用，更改不会自动保存——请及时手动导出 JSON
+</div>
+<div id="undoImportBar" class="warning-bar" hidden>
+  已导入新数据<button id="btnUndoImport">撤销导入</button>
+</div>
+<div id="canvas">
+  <div id="world">
+    <svg id="edges"></svg>
+    <div id="nodes"></div>
+  </div>
+</div>
+<div id="hint">双击节点编辑 · Tab 后继任务 · Enter 并行任务 · Space 切状态 · D 详情 · 拖动⚪连线 · 右键连线删除 · 双击空白新建</div>
+<!-- BUILD:SCRIPT -->
+<script type="module" src="ui/main.js"></script>
+<!-- /BUILD:SCRIPT -->
+</body>
+</html>
