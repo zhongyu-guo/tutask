@@ -15,7 +15,8 @@ export function createGoal(title) {
     nodes: [{
       id: 'root', type: 'goal', title,
       status: 'todo', description: '', estimatedHours: null, deadline: null,
-      x: null, y: null, collapsed: false, detailOpen: false
+      x: null, y: null, collapsed: false, detailOpen: false,
+      fill: null, stroke: null
     }],
     edges: []
   }
@@ -25,7 +26,8 @@ export function addNode(goal, { title, type }) {
   const node = {
     id: genId(), type, title,
     status: 'todo', description: '', estimatedHours: null, deadline: null,
-    x: null, y: null, collapsed: false, detailOpen: false
+    x: null, y: null, collapsed: false, detailOpen: false,
+    fill: null, stroke: null
   }
   return { ...goal, nodes: [...goal.nodes, node] }
 }
@@ -56,6 +58,17 @@ export function addEdge(goal, from, to) {
     throw new Error('Edge already exists')
   }
   return { ...goal, edges: [...goal.edges, { from, to }] }
+}
+
+export function updateEdge(goal, from, to, patch) {
+  if (!goal.edges.some(e => e.from === from && e.to === to)) {
+    throw new Error(`Edge not found: ${from}→${to}`)
+  }
+  return {
+    ...goal,
+    edges: goal.edges.map(e =>
+      (e.from === from && e.to === to ? { ...e, ...patch, from, to } : e))
+  }
 }
 
 export function removeEdge(goal, from, to) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  createGoal, addNode, updateNode, removeNode, addEdge, removeEdge
+  createGoal, addNode, updateNode, removeNode, addEdge, removeEdge, updateEdge
 } from '../src/core/model.js'
 
 describe('createGoal', () => {
@@ -117,5 +117,41 @@ describe('removeNode', () => {
   it('refuses to remove root', () => {
     const goal = createGoal('G')
     expect(() => removeNode(goal, 'root')).toThrow()
+  })
+})
+
+describe('updateEdge', () => {
+  function edged() {
+    let goal = createGoal('G')
+    goal = addNode(goal, { title: 'A', type: 'task' })
+    const a = goal.nodes[1].id
+    goal = addEdge(goal, 'root', a)
+    return { goal, a }
+  }
+
+  it('patches an edge immutably and keeps endpoints', () => {
+    const { goal, a } = edged()
+    const next = updateEdge(goal, 'root', a, { color: '#ff0000', from: 'hack' })
+    expect(next.edges[0]).toEqual({ from: 'root', to: a, color: '#ff0000' })
+    expect(goal.edges[0].color).toBeUndefined() // immutability
+  })
+
+  it('clears a color with null', () => {
+    const { goal, a } = edged()
+    const colored = updateEdge(goal, 'root', a, { color: '#ff0000' })
+    expect(updateEdge(colored, 'root', a, { color: null }).edges[0].color).toBeNull()
+  })
+
+  it('throws for a missing edge', () => {
+    const { goal } = edged()
+    expect(() => updateEdge(goal, 'root', 'nope', { color: '#fff' })).toThrow()
+  })
+})
+
+describe('node color defaults', () => {
+  it('new nodes have null fill and stroke', () => {
+    const goal = addNode(createGoal('G'), { title: 'A', type: 'task' })
+    expect(goal.nodes[0]).toMatchObject({ fill: null, stroke: null })
+    expect(goal.nodes[1]).toMatchObject({ fill: null, stroke: null })
   })
 })

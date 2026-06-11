@@ -9,6 +9,7 @@ import {
 } from './state.js'
 import { render, ensureVisible, updateTransform, NODE_W, NODE_H } from './render.js'
 import { bindFile, unbindFile } from './storage.js'
+import { openNodeStylePanel, openEdgeStylePanel, closeStylePanel } from './style-panel.js'
 
 const STATUS_CYCLE = { todo: 'doing', doing: 'done', done: 'todo' }
 
@@ -222,6 +223,7 @@ function startNodeDrag(e, nodeEl) {
       }))
     } else {
       selectNode(id)
+      openNodeStylePanel(id, ev.clientX, ev.clientY)
     }
   }
   document.addEventListener('mousemove', onMove)
@@ -385,7 +387,10 @@ export function setupInteractions() {
   nodes.addEventListener('dblclick', e => {
     if (isTextTarget(e.target) || e.target.closest('.detail-panel')) return
     const card = e.target.closest('.card')
-    if (card) startEditing(card.dataset.id)
+    if (card) {
+      closeStylePanel() // the first click of the dblclick opened it
+      startEditing(card.dataset.id)
+    }
   })
 
   nodes.addEventListener('click', e => {
@@ -428,6 +433,12 @@ export function setupInteractions() {
 
   nodes.addEventListener('focusout', e => {
     if (e.target.classList.contains('title-input')) commitEdit(e.target)
+  })
+
+  document.getElementById('edges').addEventListener('click', e => {
+    const hit = e.target.closest('.edge-hit')
+    if (!hit) return
+    openEdgeStylePanel(hit.dataset.from, hit.dataset.to, e.clientX, e.clientY)
   })
 
   document.getElementById('edges').addEventListener('contextmenu', e => {
