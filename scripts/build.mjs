@@ -14,6 +14,7 @@ const MODULES = [
   'src/ui/storage.js',
   'src/ui/state.js',
   'src/ui/render.js',
+  'src/ui/style-panel.js',
   'src/ui/interactions.js',
   'src/ui/main.js'
 ]
