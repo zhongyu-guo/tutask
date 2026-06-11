@@ -38,13 +38,28 @@ function edgePath(from, to) {
   return `M ${x1} ${y1} C ${x1 - dx} ${y1}, ${x2 + dx} ${y2}, ${x2} ${y2}`
 }
 
+export function isHexColor(value) {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(value)
+}
+
+function arrowMarker(id, fill) {
+  return `
+      <marker id="${id}" viewBox="0 0 12 12" refX="10" refY="6"
+              markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+        <path d="M 0 0.5 L 11 6 L 0 11.5 L 3.5 6 z" fill="${fill}"></path>
+      </marker>`
+}
+
 function renderEdges(svg, goal, positions, visible) {
+  // one extra arrowhead marker per custom edge color, so heads match their line
+  // (colors go into innerHTML, so only hex values from the color picker are accepted)
+  const customColors = [...new Set(
+    goal.edges.map(e => e.color).filter(c => isHexColor(c)))]
+  const markerId = new Map(customColors.map((c, i) => [c, `arrow-c${i}`]))
   svg.innerHTML = `
     <defs>
-      <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6"
-              markerWidth="9" markerHeight="9" orient="auto-start-reverse">
-        <path d="M 0 0.5 L 11 6 L 0 11.5 L 3.5 6 z" fill="var(--edge)"></path>
-      </marker>
+      ${arrowMarker('arrow', 'var(--edge)')}
+      ${customColors.map(c => arrowMarker(markerId.get(c), c)).join('')}
     </defs>`
   for (const edge of goal.edges) {
     if (!visible.has(edge.from) || !visible.has(edge.to)) continue
@@ -55,7 +70,9 @@ function renderEdges(svg, goal, positions, visible) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     path.setAttribute('d', d)
     path.setAttribute('class', 'edge')
-    path.setAttribute('marker-end', 'url(#arrow)')
+    const custom = isHexColor(edge.color) ? edge.color : null
+    path.style.stroke = custom ?? ''
+    path.setAttribute('marker-end', `url(#${custom ? markerId.get(custom) : 'arrow'})`)
     const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     hit.setAttribute('d', d)
     hit.setAttribute('class', 'edge-hit')
@@ -174,6 +191,9 @@ export function render() {
     if (inputEl) inputEl.value = node.title
     const descEl = el.querySelector('.f-description')
     if (descEl) descEl.value = node.description
+    const cardEl = el.querySelector('.card')
+    if (isHexColor(node.fill)) cardEl.style.background = node.fill
+    if (isHexColor(node.stroke)) cardEl.style.borderColor = node.stroke
     el.querySelectorAll('.prereq-item').forEach(item => {
       const pred = goal.nodes.find(n => n.id === item.dataset.target)
       item.querySelector('.prereq-title').textContent = pred ? pred.title : '?'

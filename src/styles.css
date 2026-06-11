@@ -179,6 +179,32 @@ body {
 .detail-panel input.f-hours { width: 80px; }
 .detail-panel input.f-deadline { margin-top: 6px; width: 100%; }
 
+/* ---------- style panel ---------- */
+#stylePanel {
+  position: fixed; z-index: 30; min-width: 168px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; font-size: 12.5px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.16);
+}
+#stylePanel .sp-title {
+  font-weight: 700; margin-bottom: 8px; color: var(--text);
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#stylePanel .sp-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin: 6px 0; color: var(--muted); cursor: pointer;
+}
+#stylePanel input[type="color"] {
+  width: 44px; height: 26px; padding: 1px; border: 1px solid var(--border);
+  border-radius: 6px; background: #fff; cursor: pointer;
+}
+#stylePanel .sp-actions { display: flex; gap: 6px; margin-top: 8px; }
+#stylePanel .sp-actions button {
+  flex: 1; font-size: 12px; padding: 4px 8px; cursor: pointer;
+  background: #fff; border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+}
+#stylePanel .sp-actions button:hover { background: #f0f2f5; }
+
 /* ---------- help hint ---------- */
 #hint {
   position: fixed; bottom: 10px; left: 14px; z-index: 20;
