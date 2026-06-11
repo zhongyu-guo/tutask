@@ -29,7 +29,7 @@ export function updateTransform() {
 function edgePath(from, to) {
   const x1 = from.x + NODE_W
   const y1 = from.y + NODE_H / 2
-  const x2 = to.x
+  const x2 = to.x - 5 // leave room so the arrowhead isn't covered by the card
   const y2 = to.y + NODE_H / 2
   const dx = Math.max(40, (x2 - x1) / 2)
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
@@ -38,9 +38,9 @@ function edgePath(from, to) {
 function renderEdges(svg, goal, positions, visible) {
   svg.innerHTML = `
     <defs>
-      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
-              markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-        <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--edge)"></path>
+      <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6"
+              markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+        <path d="M 0 0.5 L 11 6 L 0 11.5 L 3.5 6 z" fill="var(--edge)"></path>
       </marker>
     </defs>`
   for (const edge of goal.edges) {
