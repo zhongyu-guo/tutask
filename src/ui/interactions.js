@@ -323,10 +323,8 @@ function handleImportFile(file) {
 }
 
 async function handleBindFile() {
-  const pickExisting = window.confirm(
-    '绑定数据文件：\n「确定」= 选择已有的数据文件（采用文件中的数据）\n「取消」= 创建新的数据文件（写入当前数据）')
   try {
-    const adopted = await bindFile(appState.store, pickExisting)
+    const adopted = await bindFile(appState.store)
     if (adopted) {
       setStore(adopted)
     } else {

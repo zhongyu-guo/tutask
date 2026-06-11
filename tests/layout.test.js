@@ -81,8 +81,9 @@ describe('autoLayout (outline tree style)', () => {
     expect(gapDetail - gapBase).toBe(200)
   })
 
-  it('a parent subtree pushes the next sibling below the whole subtree', () => {
-    // root → A → (B, C); root → E. E must clear A's entire subtree.
+  it('compacts: a node rises as long as its own column is free, ignoring deeper subtree extent', () => {
+    // root → A → (B, C); root → E. A 的子树占用了更深的列，
+    // 但 E 所在的列（与 A 同列）只有 A 一个，E 应紧贴 A 下方而不是整棵子树下方。
     let goal = createGoal('G')
     const ids = {}
     for (const name of ['A', 'B', 'C', 'E']) {
@@ -96,8 +97,23 @@ describe('autoLayout (outline tree style)', () => {
     const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
     expect(pos.get(ids.A).y).toBe(pos.get(ids.B).y)
     expect(pos.get(ids.C).y).toBe(pos.get(ids.B).y + 90)
-    expect(pos.get(ids.E).y).toBe(pos.get(ids.C).y + 90) // below A's subtree
     expect(pos.get(ids.E).x).toBe(260) // same column as A
+    expect(pos.get(ids.E).y).toBe(pos.get(ids.A).y + 90) // tucked right below A
+  })
+
+  it('never lifts a later sibling above an earlier one in the same column', () => {
+    // root → (A, E); A → B. E shares A's column and must stay below A.
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'B', 'E']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, ids.A, ids.B)
+    goal = addEdge(goal, 'root', ids.E)
+    const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
+    expect(pos.get(ids.E).y).toBeGreaterThan(pos.get(ids.A).y)
   })
 
   it('places orphan nodes in column 1 below the root tree', () => {

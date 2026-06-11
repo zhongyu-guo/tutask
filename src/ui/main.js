@@ -15,9 +15,9 @@ async function initFileSync() {
     },
     onStatusChange: rerender
   })
-  watchExternalChanges()
+  watchExternalChanges(() => appState.store.currentId)
   try {
-    const result = await restoreFileBinding()
+    const result = await restoreFileBinding(appState.store)
     if (result.status === 'granted' && result.store) {
       setStore(result.store)
     } else if (result.status === 'prompt') {
