@@ -27,6 +27,7 @@ export function rerender() {
 }
 
 export function selectNode(id) {
+  if (appState.selectedId === id) return // keep DOM intact so dblclick can land
   appState.selectedId = id
   appState.renderFn()
 }
