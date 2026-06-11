@@ -10,6 +10,7 @@ const MODULES = [
   'src/core/graph.js',
   'src/core/layout.js',
   'src/core/serialize.js',
+  'src/core/store.js',
   'src/ui/storage.js',
   'src/ui/state.js',
   'src/ui/render.js',

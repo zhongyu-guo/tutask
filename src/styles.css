@@ -52,11 +52,21 @@ body {
   padding: 6px 14px; font-size: 13px; text-align: center;
 }
 #storageWarning { background: #fef3c7; color: #92400e; }
-#undoImportBar { background: #dbeafe; color: #1e40af; }
-#undoImportBar button {
+#fileReconnectBar { background: #dbeafe; color: #1e40af; }
+#fileReconnectBar button {
   margin-left: 10px; font-size: 12px; cursor: pointer;
   border: 1px solid #93c5fd; background: #fff; border-radius: 4px; padding: 2px 8px;
 }
+#goalSelect {
+  font-size: 13px; padding: 5px 6px; max-width: 180px;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text);
+}
+#fileStatus {
+  font-size: 12px; color: #166534; background: #dcfce7;
+  border-radius: 6px; padding: 4px 8px; cursor: pointer; max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#fileStatus:hover { background: #fee2e2; color: #991b1b; }
 
 /* ---------- canvas ---------- */
 #canvas {

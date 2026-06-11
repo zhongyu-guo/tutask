@@ -62,6 +62,38 @@ test('happy path: edit goal, build chain, cycle status, persist across reload', 
   expect(download.suggestedFilename()).toContain('taskdag-')
 })
 
+test('multiple goals: create, switch, rename, delete', async ({ page }) => {
+  // rename the default goal
+  await page.locator('#goalTitle').fill('目标甲')
+  await page.locator('#goalTitle').press('Enter')
+  await expect(page.locator('.node.goal .title')).toHaveText('目标甲')
+
+  // create a second goal and add a node to it
+  page.on('dialog', dialog => dialog.accept('目标乙'))
+  await page.locator('#btnNewGoal').click()
+  await expect(page.locator('.node.goal .title')).toHaveText('目标乙')
+  await page.locator('.node[data-id="root"] .card').click()
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('乙的项目')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.node')).toHaveCount(2)
+
+  // switch back to the first goal — its canvas is intact and separate
+  await page.locator('#goalSelect').selectOption({ label: '目标甲' })
+  await expect(page.locator('.node.goal .title')).toHaveText('目标甲')
+  await expect(page.locator('.node')).toHaveCount(1)
+
+  // survives reload (current goal remembered)
+  await page.reload()
+  await expect(page.locator('.node.goal .title')).toHaveText('目标甲')
+  await expect(page.locator('#goalSelect option')).toHaveCount(2)
+
+  // delete current goal falls back to the other
+  await page.locator('#btnDeleteGoal').click() // confirm auto-accepted by dialog handler
+  await expect(page.locator('.node.goal .title')).toHaveText('目标乙')
+  await expect(page.locator('#goalSelect option')).toHaveCount(1)
+})
+
 test('collapse folds the prerequisite sub-step chain with count badge', async ({ page }) => {
   // build root → A → B → C (B, C are the sub-steps that realize A)
   await page.locator('.node[data-id="root"] .card').click()

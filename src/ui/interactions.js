@@ -1,11 +1,14 @@
 import {
-  addNode, updateNode, removeNode, addEdge, removeEdge
+  addNode, updateNode, removeNode, addEdge, removeEdge, createGoal
 } from '../core/model.js'
 import { predecessorsOf, successorsOf, wouldCreateCycle } from '../core/graph.js'
 import { exportJSON, importJSON } from '../core/serialize.js'
-import { appState, setGoal, selectNode, startEditing, stopEditing, rerender } from './state.js'
+import { addGoal, switchGoal, removeGoal, renameCurrentGoal } from '../core/store.js'
+import {
+  appState, setGoal, setStore, selectNode, startEditing, stopEditing, rerender
+} from './state.js'
 import { render, ensureVisible, updateTransform, NODE_W, NODE_H } from './render.js'
-import { backupBeforeImport, undoImport } from './storage.js'
+import { bindFile, unbindFile } from './storage.js'
 
 const STATUS_CYCLE = { todo: 'doing', doing: 'done', done: 'todo' }
 
@@ -305,19 +308,33 @@ function downloadExport() {
   URL.revokeObjectURL(url)
 }
 
+// import adds the goal as a new canvas and switches to it — nothing is overwritten
 function handleImportFile(file) {
   const reader = new FileReader()
   reader.onload = () => {
     try {
       const imported = importJSON(reader.result)
-      backupBeforeImport(appState)
-      appState.selectedId = null
-      setGoal(imported)
+      setStore(addGoal(appState.store, imported))
     } catch (error) {
       window.alert('导入失败：' + error.message)
     }
   }
   reader.readAsText(file)
+}
+
+async function handleBindFile() {
+  const pickExisting = window.confirm(
+    '绑定数据文件：\n「确定」= 选择已有的数据文件（采用文件中的数据）\n「取消」= 创建新的数据文件（写入当前数据）')
+  try {
+    const adopted = await bindFile(appState.store, pickExisting)
+    if (adopted) {
+      setStore(adopted)
+    } else {
+      rerender()
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') window.alert('绑定失败：' + error.message)
+  }
 }
 
 function resetLayout() {
@@ -426,25 +443,50 @@ export function setupInteractions() {
 
   document.getElementById('goalTitle').addEventListener('change', e => {
     const title = e.target.value.trim() || appState.goal.title
-    let next = updateNode(appState.goal, 'root', { title })
-    next = { ...next, title }
-    setGoal(next)
+    setStore(renameCurrentGoal(appState.store, title))
+  })
+  document.getElementById('goalSelect').addEventListener('change', e => {
+    setStore(switchGoal(appState.store, e.target.value))
+  })
+  document.getElementById('btnNewGoal').addEventListener('click', () => {
+    const name = window.prompt('新 Goal 的名称：', '新目标')
+    if (name === null) return
+    setStore(addGoal(appState.store, createGoal(name.trim() || '新目标')))
+  })
+  document.getElementById('btnDeleteGoal').addEventListener('click', () => {
+    if (appState.store.goals.length === 1) {
+      window.alert('至少保留一个 Goal，无法删除')
+      return
+    }
+    if (!window.confirm(`删除整个 Goal「${appState.goal.title}」及其全部任务？此操作不可恢复。`)) return
+    setStore(removeGoal(appState.store, appState.store.currentId))
+  })
+  document.getElementById('btnBindFile').addEventListener('click', handleBindFile)
+  document.getElementById('fileStatus').addEventListener('click', async () => {
+    if (!window.confirm('解除数据文件绑定？（文件保留，此后更改只存在浏览器本地）')) return
+    await unbindFile()
+    rerender()
+  })
+  document.getElementById('btnFileReconnect').addEventListener('click', async () => {
+    const resume = appState.fileReconnect
+    if (!resume) return
+    try {
+      const store = await resume()
+      appState.fileReconnect = null
+      if (store) {
+        setStore(store)
+      } else {
+        rerender()
+      }
+    } catch (error) {
+      window.alert('连接失败：' + error.message)
+    }
   })
   document.getElementById('btnLayout').addEventListener('click', resetLayout)
   document.getElementById('btnExport').addEventListener('click', downloadExport)
   document.getElementById('importFile').addEventListener('change', e => {
     if (e.target.files[0]) handleImportFile(e.target.files[0])
     e.target.value = ''
-  })
-  document.getElementById('btnUndoImport').addEventListener('click', () => {
-    const backup = undoImport()
-    appState.importBackupAvailable = false
-    if (backup) {
-      appState.selectedId = null
-      setGoal(backup)
-    } else {
-      rerender()
-    }
   })
   document.getElementById('btnZoomReset').addEventListener('click', () => {
     appState.zoom = 1

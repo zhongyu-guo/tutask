@@ -1,6 +1,7 @@
 import { successorsOf, isReady, hiddenByCollapse, collapsedCount } from '../core/graph.js'
 import { autoLayout, resolvePositions } from '../core/layout.js'
 import { appState } from './state.js'
+import { fileBound, boundFileName, fileApiAvailable } from './storage.js'
 
 export const NODE_W = 210
 export const NODE_H = 64
@@ -183,8 +184,23 @@ export function render() {
   const titleInput = document.getElementById('goalTitle')
   if (document.activeElement !== titleInput) titleInput.value = goal.title
 
+  const select = document.getElementById('goalSelect')
+  select.innerHTML = ''
+  for (const entry of appState.store.goals) {
+    const option = document.createElement('option')
+    option.value = entry.id
+    option.textContent = entry.goal.title || '（未命名）'
+    option.selected = entry.id === appState.store.currentId
+    select.appendChild(option)
+  }
+
+  const fileStatus = document.getElementById('fileStatus')
+  fileStatus.hidden = !fileBound()
+  fileStatus.textContent = '📁 ' + boundFileName()
+  document.getElementById('btnBindFile').hidden = fileBound() || !fileApiAvailable()
+
   document.getElementById('storageWarning').hidden = !appState.storageBroken
-  document.getElementById('undoImportBar').hidden = !appState.importBackupAvailable
+  document.getElementById('fileReconnectBar').hidden = !appState.fileReconnect
 
   updateTransform()
 
