@@ -57,21 +57,24 @@ export function autoLayout(goal, visibleIds, opts = {}) {
   let floor = 0
   const cur = depth => Math.max(colCursor[depth] ?? 0, floor)
 
-  function layoutSubtree(id, depth) {
+  // minY carries the parent's column constraint down the first-child chain,
+  // so the whole chain settles at max(cursors of all its columns) — exactly
+  // top-aligned, and as high as those columns allow.
+  function layoutSubtree(id, depth, minY) {
     const kids = treeChildren(id)
     let y
     if (kids.length === 0) {
-      y = cur(depth)
+      y = Math.max(minY, cur(depth))
     } else {
-      for (const kid of kids) layoutSubtree(kid, depth + 1)
-      // top-align with first child, unless this column is already occupied lower
-      y = Math.max(cur(depth), pos.get(kids[0]).y)
+      y = layoutSubtree(kids[0], depth + 1, Math.max(minY, cur(depth)))
+      for (const kid of kids.slice(1)) layoutSubtree(kid, depth + 1, 0)
     }
     pos.set(id, { x: depth * gapX, y })
     colCursor[depth] = y + gapY + (detailHeights[id] || 0)
+    return y
   }
 
-  layoutSubtree('root', 0)
+  layoutSubtree('root', 0, 0)
   // orphans (no visible parent) become extra roots in column 1, below everything
   let maxY = 0
   for (const p of pos.values()) maxY = Math.max(maxY, p.y)
@@ -79,7 +82,7 @@ export function autoLayout(goal, visibleIds, opts = {}) {
   for (const node of goal.nodes) {
     if (node.id === 'root' || !visibleIds.has(node.id)) continue
     if (!primaryParent.has(node.id) && !pos.has(node.id)) {
-      layoutSubtree(node.id, 1)
+      layoutSubtree(node.id, 1, floor)
       for (const p of pos.values()) maxY = Math.max(maxY, p.y)
       floor = maxY + gapY
     }

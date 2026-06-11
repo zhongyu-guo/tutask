@@ -101,6 +101,24 @@ describe('autoLayout (outline tree style)', () => {
     expect(pos.get(ids.E).y).toBe(pos.get(ids.A).y + 90) // tucked right below A
   })
 
+  it('first-child top alignment is a hard constraint: the whole chain moves down together', () => {
+    // root → A, root → G (fill column 1 down to y=180), then root → E → F.
+    // E is forced to y=180 by its own column; F must come down WITH it, not stay at 0.
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'G', 'E', 'F']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, 'root', ids.G)
+    goal = addEdge(goal, 'root', ids.E)
+    goal = addEdge(goal, ids.E, ids.F)
+    const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
+    expect(pos.get(ids.E).y).toBe(180) // below A(0) and G(90)
+    expect(pos.get(ids.F).y).toBe(pos.get(ids.E).y) // aligned, pulled down together
+  })
+
   it('never lifts a later sibling above an earlier one in the same column', () => {
     // root → (A, E); A → B. E shares A's column and must stay below A.
     let goal = createGoal('G')
