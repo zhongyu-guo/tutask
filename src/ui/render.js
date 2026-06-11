@@ -26,13 +26,15 @@ export function updateTransform() {
   document.getElementById('zoomLabel').textContent = Math.round(appState.zoom * 100) + '%'
 }
 
+// drawn from the successor back to its prerequisite: the arrowhead points
+// toward the node being realized (i.e. toward the goal side of the graph)
 function edgePath(from, to) {
-  const x1 = from.x + NODE_W
-  const y1 = from.y + NODE_H / 2
-  const x2 = to.x - 5 // leave room so the arrowhead isn't covered by the card
-  const y2 = to.y + NODE_H / 2
-  const dx = Math.max(40, (x2 - x1) / 2)
-  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
+  const x1 = to.x
+  const y1 = to.y + NODE_H / 2
+  const x2 = from.x + NODE_W + 9 // clear the connector dot so the head stays visible
+  const y2 = from.y + NODE_H / 2
+  const dx = Math.max(40, (x1 - x2) / 2)
+  return `M ${x1} ${y1} C ${x1 - dx} ${y1}, ${x2 + dx} ${y2}, ${x2} ${y2}`
 }
 
 function renderEdges(svg, goal, positions, visible) {
