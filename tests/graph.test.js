@@ -44,48 +44,45 @@ describe('wouldCreateCycle', () => {
 })
 
 describe('isReady', () => {
-  it('todo node with all predecessors done is ready', () => {
+  // prerequisites of a node are its sub-steps: the nodes it points to (successors)
+  it('todo node with all prerequisite sub-steps done is ready', () => {
     let { goal, ids } = buildChain()
-    goal = updateNode(goal, ids.B, { status: 'done' })
-    goal = updateNode(goal, ids.X, { status: 'done' })
-    expect(isReady(goal, ids.C)).toBe(true)
+    goal = updateNode(goal, ids.C, { status: 'done' })
+    goal = updateNode(goal, ids.D, { status: 'done' })
+    expect(isReady(goal, ids.X)).toBe(true) // X's sub-steps C and D both done
   })
 
-  it('not ready when any predecessor is unfinished', () => {
+  it('not ready when any prerequisite sub-step is unfinished', () => {
     let { goal, ids } = buildChain()
-    goal = updateNode(goal, ids.B, { status: 'done' })
-    expect(isReady(goal, ids.C)).toBe(false) // X still todo
+    goal = updateNode(goal, ids.C, { status: 'done' })
+    expect(isReady(goal, ids.X)).toBe(false) // D still todo
   })
 
-  it('ignores the goal root when computing readiness', () => {
-    const { goal, ids } = buildChain()
-    // A's only predecessor is root (type goal, never done) — still ready
-    expect(isReady(goal, ids.A)).toBe(true)
-  })
-
-  it('node with no predecessors is ready, non-todo never ready', () => {
+  it('leaf node (no sub-steps) is ready, non-todo never ready', () => {
     let { goal, ids } = buildChain()
-    expect(isReady(goal, ids.X)).toBe(true)
-    goal = updateNode(goal, ids.X, { status: 'doing' })
-    expect(isReady(goal, ids.X)).toBe(false)
-    goal = updateNode(goal, ids.X, { status: 'done' })
-    expect(isReady(goal, ids.X)).toBe(false)
+    expect(isReady(goal, ids.C)).toBe(true) // leaf
+    goal = updateNode(goal, ids.C, { status: 'doing' })
+    expect(isReady(goal, ids.C)).toBe(false)
+    goal = updateNode(goal, ids.C, { status: 'done' })
+    expect(isReady(goal, ids.C)).toBe(false)
   })
 })
 
 describe('hiddenByCollapse', () => {
-  it('hides the upstream chain of a collapsed node', () => {
+  // collapsing a node folds its prerequisite subtree (the sub-steps it points to)
+  it('hides the sub-step chain of a collapsed node', () => {
     let { goal, ids } = buildChain()
-    goal = updateNode(goal, ids.C, { collapsed: true })
+    goal = updateNode(goal, ids.A, { collapsed: true })
     const hidden = hiddenByCollapse(goal)
-    // B feeds only into C → hidden. A feeds only into B (hidden) → hidden.
+    // B is reachable only through A → hidden.
     expect(hidden.has(ids.B)).toBe(true)
-    expect(hidden.has(ids.A)).toBe(true)
-    // X also feeds D (visible) → stays visible.
-    expect(hidden.has(ids.X)).toBe(false)
-    // root never hidden, C itself visible
-    expect(hidden.has('root')).toBe(false)
+    // C is also fed by X (visible) → stays visible. D untouched.
     expect(hidden.has(ids.C)).toBe(false)
+    expect(hidden.has(ids.D)).toBe(false)
+    expect(hidden.has(ids.X)).toBe(false)
+    // root never hidden, A itself visible
+    expect(hidden.has('root')).toBe(false)
+    expect(hidden.has(ids.A)).toBe(false)
   })
 
   it('returns empty set when nothing is collapsed', () => {
@@ -93,19 +90,23 @@ describe('hiddenByCollapse', () => {
     expect(hiddenByCollapse(goal).size).toBe(0)
   })
 
-  it('hides shared predecessor when all its successors are hidden or collapsed', () => {
+  it('hides shared sub-step when all paths into it are collapsed or hidden', () => {
     let { goal, ids } = buildChain()
-    goal = updateNode(goal, ids.C, { collapsed: true })
-    goal = updateNode(goal, ids.D, { collapsed: true })
+    goal = updateNode(goal, ids.A, { collapsed: true })
+    goal = updateNode(goal, ids.X, { collapsed: true })
     const hidden = hiddenByCollapse(goal)
-    expect(hidden.has(ids.X)).toBe(true) // both C and D collapsed
+    expect(hidden.has(ids.B)).toBe(true)
+    expect(hidden.has(ids.C)).toBe(true) // B hidden + X collapsed
+    expect(hidden.has(ids.D)).toBe(true)
   })
 })
 
 describe('collapsedCount', () => {
   it('counts nodes hidden specifically by this collapse', () => {
     let { goal, ids } = buildChain()
-    goal = updateNode(goal, ids.C, { collapsed: true })
-    expect(collapsedCount(goal, ids.C)).toBe(2) // A and B
+    goal = updateNode(goal, ids.A, { collapsed: true })
+    expect(collapsedCount(goal, ids.A)).toBe(1) // only B
+    goal = updateNode(goal, ids.X, { collapsed: true })
+    expect(collapsedCount(goal, ids.X)).toBe(2) // C and D (B already hidden by A)
   })
 })

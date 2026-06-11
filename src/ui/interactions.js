@@ -70,7 +70,7 @@ function deleteSelected() {
   const downstream = successorsOf(goal, selected).length
   const node = goal.nodes.find(n => n.id === selected)
   const message = downstream > 0
-    ? `删除「${node.title || '未命名'}」？将断开 ${downstream} 条到后续任务的依赖（后续任务保留）。`
+    ? `删除「${node.title || '未命名'}」？将断开与 ${downstream} 个前序步骤的连线（前序步骤保留）。`
     : `删除「${node.title || '未命名'}」？`
   if (!window.confirm(message)) return
   appState.selectedId = null

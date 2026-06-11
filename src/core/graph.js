@@ -25,14 +25,16 @@ export function wouldCreateCycle(goal, from, to) {
   return false
 }
 
+// A node's prerequisites are its sub-steps: the successors it points to.
+// The node itself can start once every sub-step is done.
 export function isReady(goal, id) {
   const node = goal.nodes.find(n => n.id === id)
   if (!node || node.type === 'goal' || node.status !== 'todo') return false
-  return predecessorsOf(goal, id)
-    .filter(p => p.type !== 'goal')
-    .every(p => p.status === 'done')
+  return successorsOf(goal, id).every(s => s.status === 'done')
 }
 
+// Collapsing a node folds its prerequisite subtree: a node is hidden when
+// every path leading into it comes from a collapsed or already-hidden node.
 function computeHidden(goal, collapsedIds) {
   const hidden = new Set()
   let changed = true
@@ -40,9 +42,9 @@ function computeHidden(goal, collapsedIds) {
     changed = false
     for (const node of goal.nodes) {
       if (node.id === 'root' || hidden.has(node.id) || collapsedIds.has(node.id)) continue
-      const successors = goal.edges.filter(e => e.from === node.id).map(e => e.to)
-      if (successors.length === 0) continue
-      const allAbsorbed = successors.every(s => collapsedIds.has(s) || hidden.has(s))
+      const preds = goal.edges.filter(e => e.to === node.id).map(e => e.from)
+      if (preds.length === 0) continue
+      const allAbsorbed = preds.every(p => collapsedIds.has(p) || hidden.has(p))
       if (allAbsorbed) {
         hidden.add(node.id)
         changed = true

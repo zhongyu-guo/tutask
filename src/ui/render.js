@@ -1,4 +1,4 @@
-import { predecessorsOf, isReady, hiddenByCollapse, collapsedCount } from '../core/graph.js'
+import { successorsOf, isReady, hiddenByCollapse, collapsedCount } from '../core/graph.js'
 import { autoLayout, resolvePositions } from '../core/layout.js'
 import { appState } from './state.js'
 
@@ -10,8 +10,8 @@ const GAP_Y = 104
 const STATUS_LABEL = { todo: '待开始', doing: '进行中', done: '已完成' }
 
 export function detailPanelHeight(goal, id) {
-  const preds = predecessorsOf(goal, id)
-  return 248 + preds.length * 26
+  const steps = successorsOf(goal, id)
+  return 248 + steps.length * 26
 }
 
 function isOverdue(node) {
@@ -92,19 +92,18 @@ function renderBadges(node) {
 }
 
 function renderCollapseBtn(goal, node) {
-  if (node.id === 'root') return ''
-  const preds = predecessorsOf(goal, node.id)
-  if (preds.length === 0) return ''
+  const steps = successorsOf(goal, node.id)
+  if (steps.length === 0) return ''
   if (node.collapsed) {
     const count = collapsedCount(goal, node.id)
-    return `<button class="collapse-btn collapsed" data-id="${node.id}" title="展开前序步骤">◂${count}</button>`
+    return `<button class="collapse-btn collapsed" data-id="${node.id}" title="展开前序步骤">${count}▸</button>`
   }
   return `<button class="collapse-btn" data-id="${node.id}" title="收起前序步骤">▾</button>`
 }
 
 function renderDetailPanel(goal, node) {
   if (!node.detailOpen) return ''
-  const preds = predecessorsOf(goal, node.id)
+  const preds = successorsOf(goal, node.id)
   const predItems = preds.length === 0
     ? '<div class="prereq-empty">（无前序，可直接开始）</div>'
     : preds.map(p =>

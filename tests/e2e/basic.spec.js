@@ -43,10 +43,11 @@ test('happy path: edit goal, build chain, cycle status, persist across reload', 
   await page.keyboard.press(' ')
   await expect(page.locator('.node.doing .title')).toHaveText('做海报')
 
-  // D opens the detail panel showing prerequisites
+  // D on the project opens the detail panel listing its prerequisite sub-steps
+  await selectNodeByTitle(page, '前期筹备')
   await page.keyboard.press('d')
   await expect(page.locator('.node.selected .detail-panel')).toBeVisible()
-  await expect(page.locator('.node.selected .prereq-title')).toHaveText('前期筹备')
+  await expect(page.locator('.node.selected .prereq-title')).toHaveText(['写文案', '做海报'])
 
   // reload: everything persisted
   await page.reload()
@@ -61,8 +62,8 @@ test('happy path: edit goal, build chain, cycle status, persist across reload', 
   expect(download.suggestedFilename()).toContain('taskdag-')
 })
 
-test('collapse hides exclusive upstream chain with count badge', async ({ page }) => {
-  // build root → A → B → C
+test('collapse folds the prerequisite sub-step chain with count badge', async ({ page }) => {
+  // build root → A → B → C (B, C are the sub-steps that realize A)
   await page.locator('.node[data-id="root"] .card').click()
   for (const name of ['A', 'B', 'C']) {
     await page.keyboard.press('Tab')
@@ -71,11 +72,11 @@ test('collapse hides exclusive upstream chain with count badge', async ({ page }
   }
   await expect(page.locator('.node')).toHaveCount(4)
 
-  // collapse C's upstream: A and B hidden (they feed only into C's chain)
-  await selectNodeByTitle(page, 'C')
+  // collapse A's prerequisite subtree: B and C hidden
+  await selectNodeByTitle(page, 'A')
   await page.locator('.node.selected .collapse-btn').click()
   await expect(page.locator('.node')).toHaveCount(2)
-  await expect(page.locator('.collapse-btn.collapsed')).toHaveText('◂2')
+  await expect(page.locator('.collapse-btn.collapsed')).toHaveText('2▸')
 
   // expand restores them
   await page.locator('.collapse-btn.collapsed').click()

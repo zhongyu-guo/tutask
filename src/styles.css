@@ -116,7 +116,7 @@ body {
 .badge.deadline.overdue { background: #fee2e2; color: var(--danger); font-weight: 700; }
 
 .collapse-btn {
-  position: absolute; left: -14px; top: 22px; z-index: 2;
+  position: absolute; right: -12px; top: -10px; z-index: 2;
   width: auto; min-width: 22px; height: 22px; padding: 0 4px;
   border-radius: 11px; border: 1px solid var(--border);
   background: #fff; color: var(--muted); font-size: 11px; cursor: pointer;
