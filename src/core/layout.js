@@ -117,6 +117,44 @@ export function reorderEdgesByPlacement(goal, positions) {
   }, goal)
 }
 
+export function reorderEdgesByReference(goal, referenceGoal) {
+  if (!referenceGoal) return goal
+  const parents = [...new Set(goal.edges.map(e => e.from))]
+  return parents.reduce((acc, parent) => {
+    const refOrder = referenceGoal.edges
+      .filter(e => e.from === parent)
+      .map(e => e.to)
+    if (refOrder.length === 0) return acc
+    const rank = new Map(refOrder.map((id, i) => [id, i]))
+    const kids = acc.edges.filter(e => e.from === parent).map(e => e.to)
+    const ordered = kids
+      .map((id, i) => ({ id, i, rank: rank.get(id) }))
+      .sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.i - b.i)
+      .map(k => k.id)
+    return reorderChildEdges(acc, parent, ordered)
+  }, goal)
+}
+
+export function normalizeLayoutGoal(goal, { positions = null, referenceGoal = null } = {}) {
+  let next = reorderEdgesByReference(goal, referenceGoal)
+  if (positions) next = reorderEdgesByPlacement(next, positions)
+
+  const connected = new Set(['root'])
+  for (const edge of next.edges) {
+    connected.add(edge.from)
+    connected.add(edge.to)
+  }
+
+  return {
+    ...next,
+    nodes: next.nodes.map(node => {
+      if (!connected.has(node.id)) return node
+      if (node.x === null && node.y === null) return node
+      return { ...node, x: null, y: null }
+    })
+  }
+}
+
 export function resolvePositions(goal, autoPos) {
   const resolved = new Map()
   for (const node of goal.nodes) {

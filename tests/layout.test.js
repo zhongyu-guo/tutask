@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { createGoal, addNode, addEdge, updateNode } from '../src/core/model.js'
 import {
   computeLayers, autoLayout, resolvePositions,
-  reorderChildEdges, reorderEdgesByPlacement
+  reorderChildEdges, reorderEdgesByPlacement,
+  reorderEdgesByReference, normalizeLayoutGoal
 } from '../src/core/layout.js'
 
 // Diamond: root → A; A → B; A → C; B → D; C → D
@@ -196,6 +197,102 @@ describe('reorderEdgesByPlacement', () => {
     const { goal, ids } = buildDiamond()
     const next = reorderEdgesByPlacement(goal, new Map())
     expect(next.edges).toEqual(goal.edges)
+  })
+})
+
+describe('reorderEdgesByReference', () => {
+  it('orders matching sibling edges by another goal snapshot', () => {
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'B', 'C']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, 'root', ids.B)
+    goal = addEdge(goal, 'root', ids.C)
+    const reference = reorderChildEdges(goal, 'root', [ids.C, ids.A, ids.B])
+
+    const next = reorderEdgesByReference(goal, reference)
+    expect(next.edges.filter(e => e.from === 'root').map(e => e.to))
+      .toEqual([ids.C, ids.A, ids.B])
+  })
+
+  it('keeps new children after referenced children in their current order', () => {
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'B', 'C']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, 'root', ids.B)
+    goal = addEdge(goal, 'root', ids.C)
+    let reference = createGoal('G')
+    reference = addNode(reference, { title: 'B', type: 'task' })
+    const refB = reference.nodes[1].id
+    reference = addNode(reference, { title: 'A', type: 'task' })
+    const refA = reference.nodes[2].id
+    reference = {
+      ...reference,
+      nodes: [
+        reference.nodes[0],
+        { ...reference.nodes[1], id: ids.B },
+        { ...reference.nodes[2], id: ids.A }
+      ],
+      edges: [{ from: 'root', to: refB }, { from: 'root', to: refA }]
+        .map(e => ({ from: e.from, to: e.to === refB ? ids.B : ids.A }))
+    }
+
+    const next = reorderEdgesByReference(goal, reference)
+    expect(next.edges.filter(e => e.from === 'root').map(e => e.to))
+      .toEqual([ids.B, ids.A, ids.C])
+  })
+})
+
+describe('normalizeLayoutGoal', () => {
+  it('clears saved positions from connected graph nodes but keeps isolated floating nodes', () => {
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'B', 'Floating']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, ids.A, ids.B)
+    goal = updateNode(goal, 'root', { x: 10, y: 20 })
+    goal = updateNode(goal, ids.A, { x: 100, y: 200 })
+    goal = updateNode(goal, ids.B, { x: 300, y: 400 })
+    goal = updateNode(goal, ids.Floating, { x: 500, y: 600 })
+
+    const next = normalizeLayoutGoal(goal)
+    expect(next.nodes.find(n => n.id === 'root')).toMatchObject({ x: null, y: null })
+    expect(next.nodes.find(n => n.id === ids.A)).toMatchObject({ x: null, y: null })
+    expect(next.nodes.find(n => n.id === ids.B)).toMatchObject({ x: null, y: null })
+    expect(next.nodes.find(n => n.id === ids.Floating)).toMatchObject({ x: 500, y: 600 })
+  })
+
+  it('can bake current vertical placement into edge order before clearing positions', () => {
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'B']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, 'root', ids.B)
+    goal = updateNode(goal, ids.A, { x: 260, y: 200 })
+    goal = updateNode(goal, ids.B, { x: 260, y: 0 })
+
+    const next = normalizeLayoutGoal(goal, {
+      positions: new Map([
+        [ids.A, { x: 260, y: 200 }],
+        [ids.B, { x: 260, y: 0 }]
+      ])
+    })
+    expect(next.edges.map(e => e.to)).toEqual([ids.B, ids.A])
+    expect(next.nodes.find(n => n.id === ids.A)).toMatchObject({ x: null, y: null })
+    expect(next.nodes.find(n => n.id === ids.B)).toMatchObject({ x: null, y: null })
   })
 })
 

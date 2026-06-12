@@ -1,6 +1,6 @@
 import { createGoal } from '../core/model.js'
 import { createStore, currentGoal } from '../core/store.js'
-import { appState, setStore, rerender } from './state.js'
+import { appState, setStore, rerender, storeWithCurrentLayoutOrder } from './state.js'
 import { render } from './render.js'
 import {
   load, save, restoreFileBinding, watchExternalChanges, setFileSyncCallbacks
@@ -17,7 +17,7 @@ async function initFileSync() {
   })
   watchExternalChanges(() => appState.store.currentId)
   try {
-    const result = await restoreFileBinding(appState.store)
+    const result = await restoreFileBinding(storeWithCurrentLayoutOrder)
     if (result.status === 'granted' && result.store) {
       setStore(result.store)
     } else if (result.status === 'prompt') {

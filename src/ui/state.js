@@ -1,5 +1,6 @@
 import { save } from './storage.js'
 import { currentGoal, updateCurrentGoal } from '../core/store.js'
+import { normalizeLayoutGoal } from '../core/layout.js'
 
 export const appState = {
   store: null,
@@ -79,6 +80,21 @@ export function setStore(store, { persist = true } = {}) {
   appState.nodeHeights.clear()
   if (persist) save(store, appState)
   appState.renderFn()
+}
+
+export function storeWithCurrentLayoutOrder() {
+  return {
+    ...appState.store,
+    goals: appState.store.goals.map(entry => {
+      const options = entry.id === appState.store.currentId
+        ? { positions: appState.lastPositions }
+        : {}
+      return {
+        ...entry,
+        goal: normalizeLayoutGoal(entry.goal, options)
+      }
+    })
+  }
 }
 
 export function rerender() {

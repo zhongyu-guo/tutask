@@ -1,5 +1,6 @@
 import { migrateStore } from '../core/store.js'
 import { validateGoal } from '../core/serialize.js'
+import { normalizeLayoutGoal } from '../core/layout.js'
 
 const KEY = 'taskdag-store'
 const LEGACY_KEY = 'taskdag-goal'
@@ -45,9 +46,21 @@ export function load() {
   try {
     const text = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY)
     if (!text) return null
-    return migrateStore(JSON.parse(text))
+    const store = migrateStore(JSON.parse(text))
+    return store ? normalizeStoreLayout(store) : null
   } catch (error) {
     return null
+  }
+}
+
+function normalizeStoreLayout(store, referenceStore = null) {
+  const refs = new Map((referenceStore?.goals ?? []).map(entry => [entry.id, entry.goal]))
+  return {
+    ...store,
+    goals: store.goals.map(entry => ({
+      ...entry,
+      goal: normalizeLayoutGoal(entry.goal, { referenceGoal: refs.get(entry.id) })
+    }))
   }
 }
 
@@ -103,7 +116,7 @@ async function scanDir() {
     try {
       const goal = JSON.parse(await file.text())
       if (validateGoal(goal).valid) {
-        entries.push({ id: handle.name.slice(0, -5), goal })
+        entries.push({ id: handle.name.slice(0, -5), goal: normalizeLayoutGoal(goal) })
         dirSync.writtenText.set(handle.name, JSON.stringify(goal, null, 2))
       }
     } catch (error) {
@@ -170,11 +183,19 @@ export async function bindFile(currentStore) {
 
 async function adoptDir(currentStore) {
   const entries = await scanDir()
-  const byId = new Map(entries.map(e => [e.id, e]))
-  for (const local of currentStore.goals) {
+  const current = normalizeStoreLayout(currentStore)
+  const currentById = new Map(current.goals.map(e => [e.id, e]))
+  const byId = new Map(entries.map(e => [
+    e.id,
+    {
+      ...e,
+      goal: normalizeLayoutGoal(e.goal, { referenceGoal: currentById.get(e.id)?.goal })
+    }
+  ]))
+  for (const local of current.goals) {
     if (!byId.has(local.id)) byId.set(local.id, local)
   }
-  const merged = storeFromEntries([...byId.values()], currentStore.currentId)
+  const merged = storeFromEntries([...byId.values()], current.currentId)
   await writeStoreToDir(merged)
   return merged
 }
@@ -189,13 +210,16 @@ export async function unbindFile() {
 
 // On startup: try to restore the saved directory handle. Returns:
 //   {status:'none'} | {status:'granted', store} | {status:'prompt', resume}
-export async function restoreFileBinding(currentStore) {
+export async function restoreFileBinding(currentStoreOrFactory) {
   if (!fileApiAvailable()) return { status: 'none' }
   const handle = await idbGet(HANDLE_KEY).catch(() => null)
   if (!handle) return { status: 'none' }
+  const currentStore = () => typeof currentStoreOrFactory === 'function'
+    ? currentStoreOrFactory()
+    : currentStoreOrFactory
   const connect = async () => {
     dirSync.handle = handle
-    const store = await adoptDir(currentStore)
+    const store = await adoptDir(currentStore())
     dirSync.onStatusChange?.()
     return store
   }

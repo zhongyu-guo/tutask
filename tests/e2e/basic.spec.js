@@ -189,7 +189,7 @@ test('legacy rendered edge arrow keeps the original direction', async ({ page })
   expect(metrics.endX).toBeLessThan(metrics.startX)
 })
 
-test('forward rendered edge arrow points to target even when target is left of source', async ({ page }) => {
+test('saved positions on connected nodes are normalized back into auto layout', async ({ page }) => {
   const node = (id, title, x, y) => ({
     id, title, x, y,
     type: id === 'root' ? 'goal' : 'task',
@@ -224,22 +224,30 @@ test('forward rendered edge arrow points to target even when target is left of s
 
   const metrics = await page.evaluate(() => {
     const edge = document.querySelector('#edges .edge-hit')
+    const a = document.querySelector('.node[data-id="a"]')
     const b = document.querySelector('.node[data-id="b"]')
     const nums = edge.getAttribute('d').match(/-?\d+(?:\.\d+)?/g).map(Number)
+    const saved = JSON.parse(localStorage.getItem('taskdag-store'))
+      .goals[0].goal.nodes.map(n => [n.id, n.x, n.y])
     return {
       startX: nums[0],
-      controlEndX: nums[4],
       endX: nums[6],
-      bRightX: parseFloat(b.style.left) + 210,
+      aX: parseFloat(a.style.left),
+      bX: parseFloat(b.style.left),
       fromId: edge.dataset.from,
-      toId: edge.dataset.to
+      toId: edge.dataset.to,
+      saved
     }
   })
   expect(metrics.fromId).toBe('a')
   expect(metrics.toId).toBe('b')
-  expect(metrics.endX).toBe(metrics.bRightX)
-  expect(metrics.startX).toBeGreaterThan(metrics.endX)
-  expect(metrics.controlEndX).toBeGreaterThan(metrics.endX)
+  expect(metrics.aX).toBeLessThan(metrics.bX)
+  expect(metrics.startX).toBeLessThan(metrics.endX)
+  expect(metrics.saved).toEqual([
+    ['root', null, null],
+    ['a', null, null],
+    ['b', null, null]
+  ])
 })
 
 test('drag preview arrow points from source toward target', async ({ page }) => {

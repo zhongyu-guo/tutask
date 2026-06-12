@@ -6,7 +6,7 @@ import { exportJSON, importJSON } from '../core/serialize.js'
 import { addGoal, switchGoal, removeGoal, renameCurrentGoal } from '../core/store.js'
 import {
   appState, setGoal, setStore, selectNode, startEditing, stopEditing, rerender,
-  undoGoal, redoGoal
+  undoGoal, redoGoal, storeWithCurrentLayoutOrder
 } from './state.js'
 import { render, ensureVisible, updateTransform, NODE_W, NODE_H } from './render.js'
 import { reorderChildEdges, reorderEdgesByPlacement } from '../core/layout.js'
@@ -418,7 +418,7 @@ function handleImportFile(file) {
 
 async function handleBindFile() {
   try {
-    const adopted = await bindFile(appState.store)
+    const adopted = await bindFile(storeWithCurrentLayoutOrder())
     if (adopted) {
       setStore(adopted)
     } else {
