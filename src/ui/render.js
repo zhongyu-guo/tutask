@@ -8,13 +8,6 @@ export const NODE_H = 64
 const GAP_X = 300
 const GAP_Y = 104
 
-const STATUS_LABEL = { todo: '待开始', doing: '进行中', done: '已完成' }
-
-export function detailPanelHeight(goal, id) {
-  const steps = successorsOf(goal, id)
-  return 248 + steps.length * 26
-}
-
 function isOverdue(node) {
   if (!node.deadline || node.status === 'done') return false
   return new Date(node.deadline + 'T23:59:59') < new Date()
@@ -119,46 +112,12 @@ function renderCollapseBtn(goal, node) {
   return `<button class="collapse-btn" data-id="${node.id}" title="收起前序步骤">▾</button>`
 }
 
-function renderDetailPanel(goal, node) {
-  if (!node.detailOpen) return ''
-  const preds = successorsOf(goal, node.id)
-  const predItems = preds.length === 0
-    ? '<div class="prereq-empty">（无前序，可直接开始）</div>'
-    : preds.map(p =>
-        `<div class="prereq-item" data-target="${p.id}">
-          <span class="dot ${p.status}"></span><span class="prereq-title"></span>
-        </div>`).join('')
-  return `
-  <div class="detail-panel" data-id="${node.id}">
-    <div class="detail-section"><div class="detail-label">前序步骤</div>${predItems}</div>
-    <div class="detail-section">
-      <div class="detail-label">详情</div>
-      <textarea class="f-description" data-id="${node.id}" placeholder="任务描述…"></textarea>
-      <div class="detail-row">
-        <select class="f-status" data-id="${node.id}">
-          ${['todo', 'doing', 'done'].map(s =>
-            `<option value="${s}"${node.status === s ? ' selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}
-        </select>
-        <input class="f-hours" data-id="${node.id}" type="number" min="0" step="0.5"
-               placeholder="工时h" value="${node.estimatedHours ?? ''}">
-      </div>
-      <input class="f-deadline" data-id="${node.id}" type="date" value="${node.deadline ?? ''}">
-    </div>
-  </div>`
-}
-
 export function render() {
   const goal = appState.goal
   const hidden = hiddenByCollapse(goal)
   const visible = new Set(goal.nodes.filter(n => !hidden.has(n.id)).map(n => n.id))
 
-  const detailHeights = {}
-  for (const node of goal.nodes) {
-    if (node.detailOpen && visible.has(node.id)) {
-      detailHeights[node.id] = detailPanelHeight(goal, node.id)
-    }
-  }
-  const auto = autoLayout(goal, visible, { gapX: GAP_X, gapY: GAP_Y, detailHeights })
+  const auto = autoLayout(goal, visible, { gapX: GAP_X, gapY: GAP_Y })
   const positions = resolvePositions(goal, auto)
   appState.lastPositions = positions
   appState.lastVisible = visible
@@ -180,24 +139,16 @@ export function render() {
       <div class="card" data-id="${node.id}">
         ${renderTitle(node)}
         ${renderBadges(node)}
-        <button class="detail-btn" data-id="${node.id}" title="任务详情 (D)">${node.detailOpen ? '⊖' : '⊕'}</button>
         <div class="connector" data-id="${node.id}" title="拖出连线建立依赖"></div>
-      </div>
-      ${renderDetailPanel(goal, node)}`
+      </div>`
     // text fields are set via textContent/value to avoid HTML injection
     const titleEl = el.querySelector('.title')
     if (titleEl) titleEl.textContent = node.title || '（未命名）'
     const inputEl = el.querySelector('.title-input')
     if (inputEl) inputEl.value = node.title
-    const descEl = el.querySelector('.f-description')
-    if (descEl) descEl.value = node.description
     const cardEl = el.querySelector('.card')
     if (isHexColor(node.fill)) cardEl.style.background = node.fill
     if (isHexColor(node.stroke)) cardEl.style.borderColor = node.stroke
-    el.querySelectorAll('.prereq-item').forEach(item => {
-      const pred = goal.nodes.find(n => n.id === item.dataset.target)
-      item.querySelector('.prereq-title').textContent = pred ? pred.title : '?'
-    })
     layer.appendChild(el)
   }
 

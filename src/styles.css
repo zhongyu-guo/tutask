@@ -128,23 +128,20 @@ body {
   border-radius: 11px; border: 1px solid var(--border);
   background: #fff; color: var(--muted); font-size: 11px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.12s;
 }
+.node:hover .collapse-btn { opacity: 1; }
 .collapse-btn:hover { color: var(--text); border-color: var(--muted); }
-.collapse-btn.collapsed { color: var(--doing); border-color: var(--doing); font-weight: 700; }
-
-.detail-btn {
-  position: absolute; right: 4px; top: 4px;
-  border: none; background: none; color: var(--muted);
-  font-size: 15px; cursor: pointer; padding: 2px;
-}
-.detail-btn:hover { color: var(--doing); }
-.node.goal .detail-btn { color: #94a3b8; }
+/* a collapsed badge carries information (hidden-node count), keep it visible */
+.collapse-btn.collapsed { color: var(--doing); border-color: var(--doing); font-weight: 700; opacity: 1; }
 
 .connector {
   position: absolute; right: -7px; top: calc(50% - 7px);
   width: 14px; height: 14px; border-radius: 50%;
   background: #fff; border: 2px solid var(--edge); cursor: crosshair; z-index: 2;
+  opacity: 0; transition: opacity 0.12s;
 }
+.node:hover .connector { opacity: 1; }
 .connector:hover { border-color: var(--doing); background: #dbeafe; }
 
 @keyframes flashRed {
@@ -153,32 +150,9 @@ body {
 }
 .node.flash-red .card { animation: flashRed 0.4s ease 2; }
 
-/* ---------- detail panel ---------- */
-.detail-panel {
-  margin-top: 6px; background: #fff; border: 1px solid var(--border);
-  border-radius: 10px; padding: 10px 12px; font-size: 12.5px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1); cursor: default;
-}
-.detail-label { font-size: 11px; font-weight: 700; color: var(--muted); margin: 4px 0; letter-spacing: 0.05em; }
-.prereq-item { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
-.prereq-item:hover { background: #f0f2f5; }
-.prereq-empty { color: var(--muted); padding: 2px 4px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.dot.todo { background: var(--todo); }
-.dot.doing { background: var(--doing); }
-.dot.done { background: var(--done); }
-.detail-panel textarea {
-  width: 100%; min-height: 56px; resize: vertical; font-family: inherit;
-  font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; padding: 6px;
-}
-.detail-row { display: flex; gap: 6px; margin-top: 6px; }
-.detail-panel select, .detail-panel input { font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
-.detail-panel input.f-hours { width: 80px; }
-.detail-panel input.f-deadline { margin-top: 6px; width: 100%; }
-
-/* ---------- style panel ---------- */
+/* ---------- node/edge panel ---------- */
 #stylePanel {
-  position: fixed; z-index: 30; min-width: 168px;
+  position: fixed; z-index: 30; min-width: 228px; max-width: 280px;
   background: #fff; border: 1px solid var(--border); border-radius: 10px;
   padding: 10px 12px; font-size: 12.5px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.16);
@@ -187,6 +161,28 @@ body {
   font-weight: 700; margin-bottom: 8px; color: var(--text);
   max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+#stylePanel .sp-label-row {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  margin: 4px 0; letter-spacing: 0.05em;
+}
+#stylePanel .sp-section { margin-bottom: 8px; }
+.prereq-item { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+.prereq-item:hover { background: #f0f2f5; }
+.prereq-empty { color: var(--muted); padding: 2px 4px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot.todo { background: var(--todo); }
+.dot.doing { background: var(--doing); }
+.dot.done { background: var(--done); }
+#stylePanel textarea.f-description {
+  width: 100%; min-height: 56px; resize: vertical; font-family: inherit;
+  font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; padding: 6px;
+}
+#stylePanel .sp-field-row { display: flex; gap: 6px; margin-top: 6px; }
+#stylePanel select, #stylePanel input {
+  font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px;
+}
+#stylePanel input.f-hours { width: 80px; }
+#stylePanel input.f-deadline { margin-top: 6px; width: 100%; }
 #stylePanel .sp-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; margin: 6px 0; color: var(--muted);
