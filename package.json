@@ -8,7 +8,9 @@
   },
   "scripts": {
     "test": "vitest run",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/watch.mjs",
+    "serve": "npx serve dist -l 4174"
   },
   "keywords": [],
   "author": "",
