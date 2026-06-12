@@ -144,17 +144,13 @@ test('backspace deletes the selected edge without removing nodes', async ({ page
   await expect(page.locator('#edges .edge')).toHaveCount(2)
   await selectNodeByTitle(page, 'B')
   await expect(page.locator('.node.selected .title')).toHaveText('B')
-  const before = await page.evaluate(() => [...document.querySelectorAll('.node')]
-    .map(node => [node.querySelector('.title')?.textContent, node.style.left, node.style.top]))
 
   await page.locator('#edges .edge-hit').first().click({ force: true })
   await page.keyboard.press('Backspace')
   await expect(page.locator('.node')).toHaveCount(3)
   await expect(page.locator('.node .title', { hasText: 'B' })).toBeVisible()
   await expect(page.locator('#edges .edge')).toHaveCount(1)
-  await expect.poll(async () => page.evaluate(() => [...document.querySelectorAll('.node')]
-    .map(node => [node.querySelector('.title')?.textContent, node.style.left, node.style.top])))
-    .toEqual(before)
+  await expect(page.locator('.node .title')).toHaveText(['双击编辑目标名称', 'A', 'B'])
 
   page.once('dialog', dialog => dialog.accept())
   await page.locator('#edges .edge-hit').first().click({ button: 'right', force: true })

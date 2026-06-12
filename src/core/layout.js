@@ -155,10 +155,22 @@ export function normalizeLayoutGoal(goal, { positions = null, referenceGoal = nu
   }
 }
 
+function manuallyPositionedIds(goal) {
+  const connected = new Set(['root'])
+  for (const edge of goal.edges) {
+    connected.add(edge.from)
+    connected.add(edge.to)
+  }
+  return new Set(goal.nodes
+    .filter(node => !connected.has(node.id) && node.x !== null && node.y !== null)
+    .map(node => node.id))
+}
+
 export function resolvePositions(goal, autoPos) {
   const resolved = new Map()
+  const manual = manuallyPositionedIds(goal)
   for (const node of goal.nodes) {
-    if (node.x !== null && node.y !== null) {
+    if (manual.has(node.id)) {
       resolved.set(node.id, { x: node.x, y: node.y })
     } else if (autoPos.has(node.id)) {
       resolved.set(node.id, autoPos.get(node.id))

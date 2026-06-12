@@ -297,12 +297,22 @@ describe('normalizeLayoutGoal', () => {
 })
 
 describe('resolvePositions', () => {
-  it('prefers manual x/y over auto positions', () => {
+  it('ignores saved x/y for connected nodes', () => {
     let { goal, ids } = buildDiamond()
     goal = updateNode(goal, ids.B, { x: 999, y: 111 })
     const auto = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
     const resolved = resolvePositions(goal, auto)
-    expect(resolved.get(ids.B)).toEqual({ x: 999, y: 111 })
+    expect(resolved.get(ids.B)).toEqual(auto.get(ids.B))
     expect(resolved.get(ids.C)).toEqual(auto.get(ids.C))
+  })
+
+  it('keeps manual x/y for isolated floating nodes', () => {
+    let goal = createGoal('G')
+    goal = addNode(goal, { title: 'Floating', type: 'task' })
+    const id = goal.nodes[1].id
+    goal = updateNode(goal, id, { x: 999, y: 111 })
+    const auto = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
+    const resolved = resolvePositions(goal, auto)
+    expect(resolved.get(id)).toEqual({ x: 999, y: 111 })
   })
 })

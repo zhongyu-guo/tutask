@@ -77,18 +77,8 @@ function deleteSelected() {
   setGoal(removeNode(appState.goal, selected))
 }
 
-function lockVisibleNodePositions(goal) {
-  return {
-    ...goal,
-    nodes: goal.nodes.map(node => {
-      const pos = appState.lastPositions.get(node.id)
-      return pos ? { ...node, x: pos.x, y: pos.y } : node
-    })
-  }
-}
-
 function removeEdgePreservingPositions(goal, from, to) {
-  return removeEdge(lockVisibleNodePositions(goal), from, to)
+  return removeEdge(goal, from, to)
 }
 
 function deleteSelectedEdge() {
