@@ -41,7 +41,7 @@ function computeHidden(goal, collapsedIds) {
   while (changed) {
     changed = false
     for (const node of goal.nodes) {
-      if (node.id === 'root' || hidden.has(node.id) || collapsedIds.has(node.id)) continue
+      if (node.id === 'root' || hidden.has(node.id)) continue
       const preds = goal.edges.filter(e => e.to === node.id).map(e => e.from)
       if (preds.length === 0) continue
       const allAbsorbed = preds.every(p => collapsedIds.has(p) || hidden.has(p))
@@ -61,14 +61,15 @@ export function hiddenByCollapse(goal) {
 }
 
 export function collapsedCount(goal, id) {
-  const all = hiddenByCollapse(goal)
-  const othersCollapsed = new Set(
-    goal.nodes.filter(n => n.collapsed && n.id !== id).map(n => n.id)
-  )
-  const withoutThis = computeHidden(goal, othersCollapsed)
-  let count = 0
-  for (const nodeId of all) {
-    if (!withoutThis.has(nodeId)) count += 1
+  const seen = new Set()
+  const stack = goal.edges.filter(e => e.from === id).map(e => e.to)
+  while (stack.length > 0) {
+    const nodeId = stack.pop()
+    if (seen.has(nodeId)) continue
+    seen.add(nodeId)
+    for (const edge of goal.edges) {
+      if (edge.from === nodeId) stack.push(edge.to)
+    }
   }
-  return count
+  return seen.size
 }

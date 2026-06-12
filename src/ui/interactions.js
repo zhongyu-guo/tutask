@@ -1,11 +1,12 @@
 import {
-  addNode, updateNode, removeNode, addEdge, removeEdge, createGoal
+  addNode, updateNode, removeNode, addEdge, removeEdge, updateEdge, createGoal
 } from '../core/model.js'
 import { predecessorsOf, successorsOf, wouldCreateCycle } from '../core/graph.js'
 import { exportJSON, importJSON } from '../core/serialize.js'
 import { addGoal, switchGoal, removeGoal, renameCurrentGoal } from '../core/store.js'
 import {
-  appState, setGoal, setStore, selectNode, startEditing, stopEditing, rerender
+  appState, setGoal, setStore, selectNode, startEditing, stopEditing, rerender,
+  undoGoal, redoGoal
 } from './state.js'
 import { render, ensureVisible, updateTransform, NODE_W, NODE_H } from './render.js'
 import { reorderChildEdges, reorderEdgesByPlacement } from '../core/layout.js'
@@ -71,15 +72,36 @@ function createFloating(worldPos) {
 function deleteSelected() {
   const selected = appState.selectedId
   if (!selected || selected === 'root') return
-  const goal = appState.goal
-  const downstream = successorsOf(goal, selected).length
-  const node = goal.nodes.find(n => n.id === selected)
-  const message = downstream > 0
-    ? `删除「${node.title || '未命名'}」？将断开与 ${downstream} 个前序步骤的连线（前序步骤保留）。`
-    : `删除「${node.title || '未命名'}」？`
-  if (!window.confirm(message)) return
   appState.selectedId = null
-  setGoal(removeNode(goal, selected))
+  appState.selectedEdge = null
+  setGoal(removeNode(appState.goal, selected))
+}
+
+function lockVisibleNodePositions(goal) {
+  return {
+    ...goal,
+    nodes: goal.nodes.map(node => {
+      const pos = appState.lastPositions.get(node.id)
+      return pos ? { ...node, x: pos.x, y: pos.y } : node
+    })
+  }
+}
+
+function removeEdgePreservingPositions(goal, from, to) {
+  return removeEdge(lockVisibleNodePositions(goal), from, to)
+}
+
+function deleteSelectedEdge() {
+  const edge = appState.selectedEdge
+  if (!edge) return false
+  if (!appState.goal.edges.some(e => e.from === edge.from && e.to === edge.to)) {
+    appState.selectedEdge = null
+    rerender()
+    return false
+  }
+  appState.selectedEdge = null
+  setGoal(removeEdgePreservingPositions(appState.goal, edge.from, edge.to))
+  return true
 }
 
 // ---------- title editing ----------
@@ -148,6 +170,18 @@ function moveSelection(direction) {
 }
 
 function onKeydown(e) {
+  const commandKey = e.metaKey || e.ctrlKey
+  if (commandKey && e.key.toLowerCase() === 'z' && !isTextTarget(e.target)) {
+    e.preventDefault()
+    if (e.shiftKey) redoGoal()
+    else undoGoal()
+    return
+  }
+  if (e.ctrlKey && e.key.toLowerCase() === 'y' && !isTextTarget(e.target)) {
+    e.preventDefault()
+    redoGoal()
+    return
+  }
   if (isTextTarget(e.target)) {
     if (e.target.classList.contains('title-input')) {
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); commitEdit(e.target) }
@@ -162,7 +196,10 @@ function onKeydown(e) {
     case 'F2':
       if (appState.selectedId) { e.preventDefault(); startEditing(appState.selectedId) }
       break
-    case 'Delete': case 'Backspace': e.preventDefault(); deleteSelected(); break
+    case 'Delete': case 'Backspace':
+      e.preventDefault()
+      if (!deleteSelectedEdge()) deleteSelected()
+      break
     case ' ': {
       e.preventDefault()
       const id = appState.selectedId
@@ -185,7 +222,7 @@ function onKeydown(e) {
     case 'ArrowRight': e.preventDefault(); moveSelection('right'); break
     case 'ArrowUp': e.preventDefault(); moveSelection('up'); break
     case 'ArrowDown': e.preventDefault(); moveSelection('down'); break
-    case 'Escape': appState.selectedId = null; rerender(); break
+    case 'Escape': appState.selectedId = null; appState.selectedEdge = null; rerender(); break
   }
 }
 
@@ -284,6 +321,7 @@ function startEdgeDrag(e, fromId) {
   const svg = document.getElementById('edges')
   const temp = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   temp.id = 'templine'
+  temp.setAttribute('marker-end', 'url(#arrow)')
   svg.appendChild(temp)
   const fromPos = appState.lastPositions.get(fromId)
   const x1 = fromPos.x + NODE_W
@@ -291,8 +329,9 @@ function startEdgeDrag(e, fromId) {
 
   function onMove(ev) {
     const p = screenToWorld(ev.clientX, ev.clientY)
-    const dx = Math.max(40, (p.x - x1) / 2)
-    temp.setAttribute('d', `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${p.x - dx} ${p.y}, ${p.x} ${p.y}`)
+    const dir = p.x >= x1 ? 1 : -1
+    const dx = Math.max(40, Math.abs(p.x - x1) / 2)
+    temp.setAttribute('d', `M ${x1} ${y1} C ${x1 + dir * dx} ${y1}, ${p.x - dir * dx} ${p.y}, ${p.x} ${p.y}`)
   }
   function onUp(ev) {
     document.removeEventListener('mousemove', onMove)
@@ -307,7 +346,10 @@ function startEdgeDrag(e, fromId) {
       flashRed(toId)
       return
     }
-    setGoal(addEdge(appState.goal, fromId, toId))
+    const next = updateEdge(addEdge(appState.goal, fromId, toId), fromId, toId, {
+      visualDirection: 'forward'
+    })
+    setGoal(next)
   }
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)
@@ -458,9 +500,24 @@ export function setupInteractions() {
     if (e.target.classList.contains('title-input')) commitEdit(e.target)
   })
 
+  function selectEdgeHit(hit) {
+    appState.selectedId = null
+    appState.selectedEdge = { from: hit.dataset.from, to: hit.dataset.to }
+    rerender()
+  }
+
+  document.getElementById('edges').addEventListener('mousedown', e => {
+    if (e.button !== 0) return
+    const hit = e.target.closest('.edge-hit')
+    if (!hit) return
+    selectEdgeHit(hit)
+    openEdgeStylePanel(hit.dataset.from, hit.dataset.to, e.clientX, e.clientY)
+  })
+
   document.getElementById('edges').addEventListener('click', e => {
     const hit = e.target.closest('.edge-hit')
     if (!hit) return
+    selectEdgeHit(hit)
     openEdgeStylePanel(hit.dataset.from, hit.dataset.to, e.clientX, e.clientY)
   })
 
@@ -469,7 +526,9 @@ export function setupInteractions() {
     if (!hit) return
     e.preventDefault()
     if (window.confirm('删除这条依赖？')) {
-      setGoal(removeEdge(appState.goal, hit.dataset.from, hit.dataset.to))
+      appState.selectedId = null
+      appState.selectedEdge = null
+      setGoal(removeEdgePreservingPositions(appState.goal, hit.dataset.from, hit.dataset.to))
     }
   })
 

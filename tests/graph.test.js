@@ -99,14 +99,38 @@ describe('hiddenByCollapse', () => {
     expect(hidden.has(ids.C)).toBe(true) // B hidden + X collapsed
     expect(hidden.has(ids.D)).toBe(true)
   })
+
+  it('lets an ancestor collapse hide descendants that are collapsed themselves', () => {
+    let { goal, ids } = buildChain()
+    goal = updateNode(goal, ids.A, { collapsed: true })
+    goal = updateNode(goal, ids.B, { collapsed: true })
+
+    let hidden = hiddenByCollapse(goal)
+    expect(hidden.has(ids.B)).toBe(true)
+    expect(hidden.has(ids.C)).toBe(false) // C still has visible X as another parent
+
+    goal = updateNode(goal, ids.A, { collapsed: false })
+    hidden = hiddenByCollapse(goal)
+    expect(hidden.has(ids.B)).toBe(false)
+    expect(hidden.has(ids.C)).toBe(false)
+  })
 })
 
 describe('collapsedCount', () => {
-  it('counts nodes hidden specifically by this collapse', () => {
+  it('counts all descendant sub-step nodes', () => {
     let { goal, ids } = buildChain()
     goal = updateNode(goal, ids.A, { collapsed: true })
-    expect(collapsedCount(goal, ids.A)).toBe(1) // only B
+    expect(collapsedCount(goal, ids.A)).toBe(2) // B and C
     goal = updateNode(goal, ids.X, { collapsed: true })
-    expect(collapsedCount(goal, ids.X)).toBe(2) // C and D (B already hidden by A)
+    expect(collapsedCount(goal, ids.X)).toBe(2) // C and D
+  })
+
+  it('does not depend on whether descendants are currently hidden', () => {
+    let { goal, ids } = buildChain()
+    goal = updateNode(goal, ids.B, { collapsed: true })
+    expect(collapsedCount(goal, ids.B)).toBe(1) // C
+
+    goal = updateNode(goal, ids.A, { collapsed: true })
+    expect(collapsedCount(goal, ids.A)).toBe(2) // B and C
   })
 })

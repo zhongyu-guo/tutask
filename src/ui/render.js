@@ -20,15 +20,19 @@ export function updateTransform() {
   document.getElementById('zoomLabel').textContent = Math.round(appState.zoom * 100) + '%'
 }
 
-// drawn from the successor back to its prerequisite: the arrowhead points
-// toward the node being realized (i.e. toward the goal side of the graph)
-function edgePath(from, to) {
-  const x1 = to.x
-  const y1 = to.y + NODE_H / 2
-  const x2 = from.x + NODE_W + 9 // clear the connector dot so the head stays visible
-  const y2 = from.y + NODE_H / 2
-  const dx = Math.max(40, (x1 - x2) / 2)
-  return `M ${x1} ${y1} C ${x1 - dx} ${y1}, ${x2 + dx} ${y2}, ${x2} ${y2}`
+function edgePath(from, to, fromHeight = NODE_H, toHeight = NODE_H, direction = 'legacy') {
+  const source = direction === 'forward' ? from : to
+  const target = direction === 'forward' ? to : from
+  const sourceHeight = direction === 'forward' ? fromHeight : toHeight
+  const targetHeight = direction === 'forward' ? toHeight : fromHeight
+  const targetOnRight = target.x + NODE_W / 2 >= source.x + NODE_W / 2
+  const dir = targetOnRight ? 1 : -1
+  const x1 = targetOnRight ? source.x + NODE_W + 9 : source.x - 9
+  const y1 = source.y + sourceHeight / 2
+  const x2 = targetOnRight ? target.x : target.x + NODE_W
+  const y2 = target.y + targetHeight / 2
+  const dx = Math.max(40, Math.abs(x2 - x1) / 2)
+  return `M ${x1} ${y1} C ${x1 + dir * dx} ${y1}, ${x2 - dir * dx} ${y2}, ${x2} ${y2}`
 }
 
 export function isHexColor(value) {
@@ -41,6 +45,10 @@ function arrowMarker(id, fill) {
               markerWidth="9" markerHeight="9" orient="auto-start-reverse">
         <path d="M 0 0.5 L 11 6 L 0 11.5 L 3.5 6 z" fill="${fill}"></path>
       </marker>`
+}
+
+function nodeHeight(id) {
+  return appState.nodeHeights.get(id) ?? NODE_H
 }
 
 function renderEdges(svg, goal, positions, visible) {
@@ -59,10 +67,11 @@ function renderEdges(svg, goal, positions, visible) {
     const from = positions.get(edge.from)
     const to = positions.get(edge.to)
     if (!from || !to) continue
-    const d = edgePath(from, to)
+    const d = edgePath(from, to, nodeHeight(edge.from), nodeHeight(edge.to), edge.visualDirection)
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     path.setAttribute('d', d)
-    path.setAttribute('class', 'edge')
+    const selected = appState.selectedEdge?.from === edge.from && appState.selectedEdge?.to === edge.to
+    path.setAttribute('class', selected ? 'edge selected' : 'edge')
     const custom = isHexColor(edge.color) ? edge.color : null
     path.style.stroke = custom ?? ''
     path.setAttribute('marker-end', `url(#${custom ? markerId.get(custom) : 'arrow'})`)
@@ -116,8 +125,11 @@ export function render() {
   const goal = appState.goal
   const hidden = hiddenByCollapse(goal)
   const visible = new Set(goal.nodes.filter(n => !hidden.has(n.id)).map(n => n.id))
+  const detailHeights = Object.fromEntries([...appState.nodeHeights.entries()]
+    .filter(([id, height]) => visible.has(id) && height > NODE_H)
+    .map(([id, height]) => [id, height - NODE_H]))
 
-  const auto = autoLayout(goal, visible, { gapX: GAP_X, gapY: GAP_Y })
+  const auto = autoLayout(goal, visible, { gapX: GAP_X, gapY: GAP_Y, detailHeights })
   const positions = resolvePositions(goal, auto)
   appState.lastPositions = positions
   appState.lastVisible = visible
@@ -148,6 +160,7 @@ export function render() {
     if (inputEl) inputEl.value = node.title
     layer.appendChild(el)
   }
+  syncMeasuredNodeHeights(layer, visible)
 
   const titleInput = document.getElementById('goalTitle')
   if (document.activeElement !== titleInput) titleInput.value = goal.title
@@ -179,6 +192,25 @@ export function render() {
   }
 }
 
+function syncMeasuredNodeHeights(layer, visible) {
+  let changed = false
+  for (const id of [...appState.nodeHeights.keys()]) {
+    if (!visible.has(id)) {
+      appState.nodeHeights.delete(id)
+      changed = true
+    }
+  }
+  for (const el of layer.querySelectorAll('.node')) {
+    const id = el.dataset.id
+    const height = Math.ceil(el.querySelector('.card')?.getBoundingClientRect().height ?? NODE_H)
+    if (Math.abs((appState.nodeHeights.get(id) ?? NODE_H) - height) > 1) {
+      appState.nodeHeights.set(id, height)
+      changed = true
+    }
+  }
+  if (changed) requestAnimationFrame(() => appState.renderFn())
+}
+
 export function ensureVisible(id) {
   const pos = appState.lastPositions.get(id)
   if (!pos) return
@@ -190,7 +222,7 @@ export function ensureVisible(id) {
   if (sx < margin) appState.pan.x += margin - sx
   if (sy < margin) appState.pan.y += margin - sy
   const right = sx + NODE_W * appState.zoom
-  const bottom = sy + NODE_H * appState.zoom
+  const bottom = sy + nodeHeight(id) * appState.zoom
   if (right > rect.width - margin) appState.pan.x -= right - (rect.width - margin)
   if (bottom > rect.height - margin) appState.pan.y -= bottom - (rect.height - margin)
   updateTransform()

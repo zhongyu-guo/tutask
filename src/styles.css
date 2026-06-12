@@ -82,6 +82,7 @@ body {
 #nodes { position: absolute; }
 
 .edge { fill: none; stroke: var(--edge); stroke-width: 2; }
+.edge.selected { stroke: var(--danger); stroke-width: 3; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; pointer-events: stroke; }
 .edge-hit:hover + .edge, .edge-hit:hover { stroke: rgba(239, 68, 68, 0.18); }
 #templine { fill: none; stroke: var(--doing); stroke-width: 2; stroke-dasharray: 6 5; pointer-events: none; }
