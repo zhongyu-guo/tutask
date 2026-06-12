@@ -25,12 +25,12 @@ export function wouldCreateCycle(goal, from, to) {
   return false
 }
 
-// A node's prerequisites are its sub-steps: the successors it points to.
+// A node's prerequisites are its sub-steps: the children pointing into it.
 // The node itself can start once every sub-step is done.
 export function isReady(goal, id) {
   const node = goal.nodes.find(n => n.id === id)
   if (!node || node.type === 'goal' || node.status !== 'todo') return false
-  return successorsOf(goal, id).every(s => s.status === 'done')
+  return predecessorsOf(goal, id).every(s => s.status === 'done')
 }
 
 // Collapsing a node folds its prerequisite subtree: a node is hidden when
@@ -42,9 +42,9 @@ function computeHidden(goal, collapsedIds) {
     changed = false
     for (const node of goal.nodes) {
       if (node.id === 'root' || hidden.has(node.id)) continue
-      const preds = goal.edges.filter(e => e.to === node.id).map(e => e.from)
-      if (preds.length === 0) continue
-      const allAbsorbed = preds.every(p => collapsedIds.has(p) || hidden.has(p))
+      const parents = goal.edges.filter(e => e.from === node.id).map(e => e.to)
+      if (parents.length === 0) continue
+      const allAbsorbed = parents.every(p => collapsedIds.has(p) || hidden.has(p))
       if (allAbsorbed) {
         hidden.add(node.id)
         changed = true
@@ -62,13 +62,13 @@ export function hiddenByCollapse(goal) {
 
 export function collapsedCount(goal, id) {
   const seen = new Set()
-  const stack = goal.edges.filter(e => e.from === id).map(e => e.to)
+  const stack = goal.edges.filter(e => e.to === id).map(e => e.from)
   while (stack.length > 0) {
     const nodeId = stack.pop()
     if (seen.has(nodeId)) continue
     seen.add(nodeId)
     for (const edge of goal.edges) {
-      if (edge.from === nodeId) stack.push(edge.to)
+      if (edge.to === nodeId) stack.push(edge.from)
     }
   }
   return seen.size

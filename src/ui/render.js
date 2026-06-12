@@ -1,4 +1,4 @@
-import { successorsOf, isReady, hiddenByCollapse, collapsedCount } from '../core/graph.js'
+import { predecessorsOf, isReady, hiddenByCollapse, collapsedCount } from '../core/graph.js'
 import { autoLayout, resolvePositions } from '../core/layout.js'
 import { appState } from './state.js'
 import { fileBound, boundFileName, fileApiAvailable } from './storage.js'
@@ -20,11 +20,11 @@ export function updateTransform() {
   document.getElementById('zoomLabel').textContent = Math.round(appState.zoom * 100) + '%'
 }
 
-function edgePath(from, to, fromHeight = NODE_H, toHeight = NODE_H, direction = 'legacy') {
-  const source = direction === 'forward' ? from : to
-  const target = direction === 'forward' ? to : from
-  const sourceHeight = direction === 'forward' ? fromHeight : toHeight
-  const targetHeight = direction === 'forward' ? toHeight : fromHeight
+function edgePath(from, to, fromHeight = NODE_H, toHeight = NODE_H) {
+  const source = from
+  const target = to
+  const sourceHeight = fromHeight
+  const targetHeight = toHeight
   const targetOnRight = target.x + NODE_W / 2 >= source.x + NODE_W / 2
   const dir = targetOnRight ? 1 : -1
   const x1 = targetOnRight ? source.x + NODE_W + 9 : source.x - 9
@@ -67,7 +67,7 @@ function renderEdges(svg, goal, positions, visible) {
     const from = positions.get(edge.from)
     const to = positions.get(edge.to)
     if (!from || !to) continue
-    const d = edgePath(from, to, nodeHeight(edge.from), nodeHeight(edge.to), edge.visualDirection)
+    const d = edgePath(from, to, nodeHeight(edge.from), nodeHeight(edge.to))
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     path.setAttribute('d', d)
     const selected = appState.selectedEdge?.from === edge.from && appState.selectedEdge?.to === edge.to
@@ -112,7 +112,7 @@ function renderBadges(node) {
 }
 
 function renderCollapseBtn(goal, node) {
-  const steps = successorsOf(goal, node.id)
+  const steps = predecessorsOf(goal, node.id)
   if (steps.length === 0) return ''
   if (node.collapsed) {
     const count = collapsedCount(goal, node.id)

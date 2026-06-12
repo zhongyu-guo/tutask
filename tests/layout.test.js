@@ -6,7 +6,7 @@ import {
   reorderEdgesByReference, normalizeLayoutGoal
 } from '../src/core/layout.js'
 
-// Diamond: root → A; A → B; A → C; B → D; C → D
+// Diamond with child -> parent edges: A → root; B/C → A; D → B/C
 function buildDiamond() {
   let goal = createGoal('G')
   const ids = {}
@@ -14,11 +14,11 @@ function buildDiamond() {
     goal = addNode(goal, { title: name, type: 'task' })
     ids[name] = goal.nodes[goal.nodes.length - 1].id
   }
-  goal = addEdge(goal, 'root', ids.A)
-  goal = addEdge(goal, ids.A, ids.B)
-  goal = addEdge(goal, ids.A, ids.C)
-  goal = addEdge(goal, ids.B, ids.D)
-  goal = addEdge(goal, ids.C, ids.D)
+  goal = addEdge(goal, ids.A, 'root')
+  goal = addEdge(goal, ids.B, ids.A)
+  goal = addEdge(goal, ids.C, ids.A)
+  goal = addEdge(goal, ids.D, ids.B)
+  goal = addEdge(goal, ids.D, ids.C)
   return { goal, ids }
 }
 
@@ -94,10 +94,10 @@ describe('autoLayout (outline tree style)', () => {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, ids.A, ids.B)
-    goal = addEdge(goal, ids.A, ids.C)
-    goal = addEdge(goal, 'root', ids.E)
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.B, ids.A)
+    goal = addEdge(goal, ids.C, ids.A)
+    goal = addEdge(goal, ids.E, 'root')
     const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
     expect(pos.get(ids.A).y).toBe(pos.get(ids.B).y)
     expect(pos.get(ids.C).y).toBe(pos.get(ids.B).y + 90)
@@ -114,10 +114,10 @@ describe('autoLayout (outline tree style)', () => {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, 'root', ids.G)
-    goal = addEdge(goal, 'root', ids.E)
-    goal = addEdge(goal, ids.E, ids.F)
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.G, 'root')
+    goal = addEdge(goal, ids.E, 'root')
+    goal = addEdge(goal, ids.F, ids.E)
     const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
     expect(pos.get(ids.E).y).toBe(180) // below A(0) and G(90)
     expect(pos.get(ids.F).y).toBe(pos.get(ids.E).y) // aligned, pulled down together
@@ -131,9 +131,9 @@ describe('autoLayout (outline tree style)', () => {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, ids.A, ids.B)
-    goal = addEdge(goal, 'root', ids.E)
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.B, ids.A)
+    goal = addEdge(goal, ids.E, 'root')
     const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
     expect(pos.get(ids.E).y).toBeGreaterThan(pos.get(ids.A).y)
   })
@@ -152,42 +152,42 @@ describe('reorderChildEdges', () => {
   it('reorders one parent’s outgoing edges to match the given child order, immutably', () => {
     const { goal, ids } = buildDiamond()
     const next = reorderChildEdges(goal, ids.A, [ids.C, ids.B])
-    // A's edges flipped, others untouched
-    const aKids = next.edges.filter(e => e.from === ids.A).map(e => e.to)
+    // A's child edges flipped, others untouched
+    const aKids = next.edges.filter(e => e.to === ids.A).map(e => e.from)
     expect(aKids).toEqual([ids.C, ids.B])
-    expect(next.edges.filter(e => e.from !== ids.A))
-      .toEqual(goal.edges.filter(e => e.from !== ids.A))
+    expect(next.edges.filter(e => e.to !== ids.A))
+      .toEqual(goal.edges.filter(e => e.to !== ids.A))
     // original goal not mutated
-    expect(goal.edges.filter(e => e.from === ids.A).map(e => e.to)).toEqual([ids.B, ids.C])
+    expect(goal.edges.filter(e => e.to === ids.A).map(e => e.from)).toEqual([ids.B, ids.C])
   })
 
   it('keeps each group edge in the from-group’s original slots', () => {
     const { goal, ids } = buildDiamond()
     const next = reorderChildEdges(goal, ids.A, [ids.C, ids.B])
-    // global slot indices of A's edges are unchanged (only contents swapped)
-    const slots = g => g.edges.map((e, i) => (e.from === ids.A ? i : null)).filter(i => i !== null)
+    // global slot indices of A's child edges are unchanged (only contents swapped)
+    const slots = g => g.edges.map((e, i) => (e.to === ids.A ? i : null)).filter(i => i !== null)
     expect(slots(next)).toEqual(slots(goal))
   })
 })
 
 describe('reorderEdgesByPlacement', () => {
   it('orders siblings by their current vertical position', () => {
-    // root → A, root → E in edge order; user moved E above A
+    // A → root, E → root in edge order; user moved E above A
     let goal = createGoal('G')
     const ids = {}
     for (const name of ['A', 'E']) {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, 'root', ids.E)
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.E, 'root')
     const positions = new Map([
       ['root', { x: 0, y: 0 }],
       [ids.A, { x: 260, y: 200 }],
       [ids.E, { x: 260, y: 10 }]
     ])
     const next = reorderEdgesByPlacement(goal, positions)
-    expect(next.edges.map(e => e.to)).toEqual([ids.E, ids.A])
+    expect(next.edges.map(e => e.from)).toEqual([ids.E, ids.A])
     // autoLayout now puts E on top
     const pos = autoLayout(next, allVisible(next), { gapX: 260, gapY: 90 })
     expect(pos.get(ids.E).y).toBeLessThan(pos.get(ids.A).y)
@@ -208,13 +208,13 @@ describe('reorderEdgesByReference', () => {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, 'root', ids.B)
-    goal = addEdge(goal, 'root', ids.C)
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.B, 'root')
+    goal = addEdge(goal, ids.C, 'root')
     const reference = reorderChildEdges(goal, 'root', [ids.C, ids.A, ids.B])
 
     const next = reorderEdgesByReference(goal, reference)
-    expect(next.edges.filter(e => e.from === 'root').map(e => e.to))
+    expect(next.edges.filter(e => e.to === 'root').map(e => e.from))
       .toEqual([ids.C, ids.A, ids.B])
   })
 
@@ -225,27 +225,13 @@ describe('reorderEdgesByReference', () => {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, 'root', ids.B)
-    goal = addEdge(goal, 'root', ids.C)
-    let reference = createGoal('G')
-    reference = addNode(reference, { title: 'B', type: 'task' })
-    const refB = reference.nodes[1].id
-    reference = addNode(reference, { title: 'A', type: 'task' })
-    const refA = reference.nodes[2].id
-    reference = {
-      ...reference,
-      nodes: [
-        reference.nodes[0],
-        { ...reference.nodes[1], id: ids.B },
-        { ...reference.nodes[2], id: ids.A }
-      ],
-      edges: [{ from: 'root', to: refB }, { from: 'root', to: refA }]
-        .map(e => ({ from: e.from, to: e.to === refB ? ids.B : ids.A }))
-    }
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.B, 'root')
+    goal = addEdge(goal, ids.C, 'root')
+    const reference = reorderChildEdges(goal, 'root', [ids.B, ids.A])
 
     const next = reorderEdgesByReference(goal, reference)
-    expect(next.edges.filter(e => e.from === 'root').map(e => e.to))
+    expect(next.edges.filter(e => e.to === 'root').map(e => e.from))
       .toEqual([ids.B, ids.A, ids.C])
   })
 })
@@ -258,8 +244,8 @@ describe('normalizeLayoutGoal', () => {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, ids.A, ids.B)
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.B, ids.A)
     goal = updateNode(goal, 'root', { x: 10, y: 20 })
     goal = updateNode(goal, ids.A, { x: 100, y: 200 })
     goal = updateNode(goal, ids.B, { x: 300, y: 400 })
@@ -279,8 +265,8 @@ describe('normalizeLayoutGoal', () => {
       goal = addNode(goal, { title: name, type: 'task' })
       ids[name] = goal.nodes[goal.nodes.length - 1].id
     }
-    goal = addEdge(goal, 'root', ids.A)
-    goal = addEdge(goal, 'root', ids.B)
+    goal = addEdge(goal, ids.A, 'root')
+    goal = addEdge(goal, ids.B, 'root')
     goal = updateNode(goal, ids.A, { x: 260, y: 200 })
     goal = updateNode(goal, ids.B, { x: 260, y: 0 })
 
@@ -290,7 +276,7 @@ describe('normalizeLayoutGoal', () => {
         [ids.B, { x: 260, y: 0 }]
       ])
     })
-    expect(next.edges.map(e => e.to)).toEqual([ids.B, ids.A])
+    expect(next.edges.map(e => e.from)).toEqual([ids.B, ids.A])
     expect(next.nodes.find(n => n.id === ids.A)).toMatchObject({ x: null, y: null })
     expect(next.nodes.find(n => n.id === ids.B)).toMatchObject({ x: null, y: null })
   })

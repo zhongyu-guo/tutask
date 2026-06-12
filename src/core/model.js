@@ -12,6 +12,7 @@ function findNode(goal, id) {
 export function createGoal(title) {
   return {
     title,
+    edgeDirection: 'child-to-parent',
     nodes: [{
       id: 'root', type: 'goal', title,
       status: 'todo', description: '', estimatedHours: null, deadline: null,

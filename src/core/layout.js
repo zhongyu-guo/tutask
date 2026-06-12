@@ -8,17 +8,17 @@ export function computeLayers(goal, visibleIds) {
   while (pending.size > 0) {
     let progressed = false
     for (const id of [...pending]) {
-      const preds = goal.edges
-        .filter(e => e.to === id && visibleIds.has(e.from))
-        .map(e => e.from)
-      if (preds.length === 0) {
+      const parents = goal.edges
+        .filter(e => e.from === id && visibleIds.has(e.to))
+        .map(e => e.to)
+      if (parents.length === 0) {
         layers.set(id, 1)
         pending.delete(id)
         progressed = true
         continue
       }
-      if (preds.every(p => layers.has(p))) {
-        layers.set(id, Math.max(...preds.map(p => layers.get(p))) + 1)
+      if (parents.every(p => layers.has(p))) {
+        layers.set(id, Math.max(...parents.map(p => layers.get(p))) + 1)
         pending.delete(id)
         progressed = true
       }
@@ -36,7 +36,8 @@ export function computeLayers(goal, visibleIds) {
 // - each node is top-aligned with its first child
 // - siblings stack vertically in the same column (depth * gapX)
 // - a subtree pushes the next sibling below its full extent
-// The DAG is treed by "primary parent": the first visible edge into a node.
+// Edges are stored as child -> parent. The DAG is treed by "primary parent":
+// the first visible outgoing edge from a child node.
 export function autoLayout(goal, visibleIds, opts = {}) {
   const { gapX = 260, gapY = 90, detailHeights = {} } = opts
   const pos = new Map()
@@ -44,12 +45,12 @@ export function autoLayout(goal, visibleIds, opts = {}) {
   const primaryParent = new Map()
   for (const node of goal.nodes) {
     if (!visibleIds.has(node.id)) continue
-    const first = goal.edges.find(e => e.to === node.id && visibleIds.has(e.from))
-    if (first) primaryParent.set(node.id, first.from)
+    const first = goal.edges.find(e => e.from === node.id && visibleIds.has(e.to))
+    if (first) primaryParent.set(node.id, first.to)
   }
   const treeChildren = id => goal.edges
-    .filter(e => e.from === id && visibleIds.has(e.to) && primaryParent.get(e.to) === id)
-    .map(e => e.to)
+    .filter(e => e.to === id && visibleIds.has(e.from) && primaryParent.get(e.from) === id)
+    .map(e => e.from)
 
   // per-column cursors: a node only needs to clear its OWN column,
   // so it rises as high as possible even when deeper subtrees extend far down
@@ -96,19 +97,19 @@ export function autoLayout(goal, visibleIds, opts = {}) {
 // so edges from different parents never swap relative order.
 export function reorderChildEdges(goal, parentId, orderedChildIds) {
   const rank = new Map(orderedChildIds.map((id, i) => [id, i]))
-  const group = goal.edges.filter(e => e.from === parentId && rank.has(e.to))
+  const group = goal.edges.filter(e => e.to === parentId && rank.has(e.from))
   if (group.length < 2) return goal
-  const sorted = [...group].sort((a, b) => rank.get(a.to) - rank.get(b.to))
+  const sorted = [...group].sort((a, b) => rank.get(a.from) - rank.get(b.from))
   let i = 0
   const edges = goal.edges.map(e =>
-    (e.from === parentId && rank.has(e.to)) ? sorted[i++] : e)
+    (e.to === parentId && rank.has(e.from)) ? sorted[i++] : e)
   return { ...goal, edges }
 }
 
 export function reorderEdgesByPlacement(goal, positions) {
-  const parents = [...new Set(goal.edges.map(e => e.from))]
+  const parents = [...new Set(goal.edges.map(e => e.to))]
   return parents.reduce((acc, parent) => {
-    const kids = acc.edges.filter(e => e.from === parent).map(e => e.to)
+    const kids = acc.edges.filter(e => e.to === parent).map(e => e.from)
     const ordered = kids
       .map((id, i) => ({ id, i, y: positions.get(id)?.y }))
       .sort((a, b) => (a.y ?? Infinity) - (b.y ?? Infinity) || a.i - b.i)
@@ -117,16 +118,35 @@ export function reorderEdgesByPlacement(goal, positions) {
   }, goal)
 }
 
+export function normalizeEdgeDirections(goal) {
+  const alreadyCanonical = goal.edgeDirection === 'child-to-parent'
+    || (goal.edges.some(e => e.to === 'root') && !goal.edges.some(e => e.from === 'root'))
+  const seen = new Set()
+  const edges = []
+  for (const edge of goal.edges) {
+    const normalized = alreadyCanonical || edge.visualDirection === 'forward'
+      ? { ...edge }
+      : { ...edge, from: edge.to, to: edge.from }
+    delete normalized.visualDirection
+    const key = `${normalized.from}→${normalized.to}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    edges.push(normalized)
+  }
+  return { ...goal, edgeDirection: 'child-to-parent', edges }
+}
+
 export function reorderEdgesByReference(goal, referenceGoal) {
   if (!referenceGoal) return goal
-  const parents = [...new Set(goal.edges.map(e => e.from))]
+  const reference = normalizeEdgeDirections(referenceGoal)
+  const parents = [...new Set(goal.edges.map(e => e.to))]
   return parents.reduce((acc, parent) => {
-    const refOrder = referenceGoal.edges
-      .filter(e => e.from === parent)
-      .map(e => e.to)
+    const refOrder = reference.edges
+      .filter(e => e.to === parent)
+      .map(e => e.from)
     if (refOrder.length === 0) return acc
     const rank = new Map(refOrder.map((id, i) => [id, i]))
-    const kids = acc.edges.filter(e => e.from === parent).map(e => e.to)
+    const kids = acc.edges.filter(e => e.to === parent).map(e => e.from)
     const ordered = kids
       .map((id, i) => ({ id, i, rank: rank.get(id) }))
       .sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.i - b.i)
@@ -136,7 +156,7 @@ export function reorderEdgesByReference(goal, referenceGoal) {
 }
 
 export function normalizeLayoutGoal(goal, { positions = null, referenceGoal = null } = {}) {
-  let next = reorderEdgesByReference(goal, referenceGoal)
+  let next = reorderEdgesByReference(normalizeEdgeDirections(goal), referenceGoal)
   if (positions) next = reorderEdgesByPlacement(next, positions)
 
   const connected = new Set(['root'])

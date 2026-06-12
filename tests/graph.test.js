@@ -5,7 +5,7 @@ import {
   hiddenByCollapse, collapsedCount
 } from '../src/core/graph.js'
 
-// Build: root → A → B → C, plus X → C (shared predecessor scenario via X → D)
+// Build with child -> parent edges: A → root, B → A, C → B and C → X, D → X.
 function buildChain() {
   let goal = createGoal('G')
   const ids = {}
@@ -13,30 +13,30 @@ function buildChain() {
     goal = addNode(goal, { title: name, type: 'task' })
     ids[name] = goal.nodes[goal.nodes.length - 1].id
   }
-  goal = addEdge(goal, 'root', ids.A)
-  goal = addEdge(goal, ids.A, ids.B)
-  goal = addEdge(goal, ids.B, ids.C)
-  goal = addEdge(goal, ids.X, ids.C)
-  goal = addEdge(goal, ids.X, ids.D)
+  goal = addEdge(goal, ids.A, 'root')
+  goal = addEdge(goal, ids.B, ids.A)
+  goal = addEdge(goal, ids.C, ids.B)
+  goal = addEdge(goal, ids.C, ids.X)
+  goal = addEdge(goal, ids.D, ids.X)
   return { goal, ids }
 }
 
 describe('predecessorsOf / successorsOf', () => {
   it('returns direct neighbors', () => {
     const { goal, ids } = buildChain()
-    expect(predecessorsOf(goal, ids.C).map(n => n.id).sort())
-      .toEqual([ids.B, ids.X].sort())
-    expect(successorsOf(goal, ids.X).map(n => n.id).sort())
+    expect(predecessorsOf(goal, ids.X).map(n => n.id).sort())
       .toEqual([ids.C, ids.D].sort())
-    expect(predecessorsOf(goal, ids.A).map(n => n.id)).toEqual(['root'])
+    expect(successorsOf(goal, ids.C).map(n => n.id).sort())
+      .toEqual([ids.B, ids.X].sort())
+    expect(predecessorsOf(goal, ids.A).map(n => n.id)).toEqual([ids.B])
   })
 })
 
 describe('wouldCreateCycle', () => {
   it('detects cycles through transitive paths', () => {
     const { goal, ids } = buildChain()
-    expect(wouldCreateCycle(goal, ids.C, ids.A)).toBe(true) // C→A closes A→B→C
-    expect(wouldCreateCycle(goal, ids.C, 'root')).toBe(true)
+    expect(wouldCreateCycle(goal, ids.A, ids.C)).toBe(true) // A→C closes C→B→A
+    expect(wouldCreateCycle(goal, 'root', ids.C)).toBe(true)
     expect(wouldCreateCycle(goal, ids.A, ids.A)).toBe(true) // self
     expect(wouldCreateCycle(goal, ids.D, ids.C)).toBe(false)
     expect(wouldCreateCycle(goal, ids.A, ids.D)).toBe(false)

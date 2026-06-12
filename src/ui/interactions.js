@@ -1,5 +1,5 @@
 import {
-  addNode, updateNode, removeNode, addEdge, removeEdge, updateEdge, createGoal
+  addNode, updateNode, removeNode, addEdge, removeEdge, createGoal
 } from '../core/model.js'
 import { predecessorsOf, successorsOf, wouldCreateCycle } from '../core/graph.js'
 import { exportJSON, importJSON } from '../core/serialize.js'
@@ -41,7 +41,7 @@ function createSuccessor() {
   const type = parent.type === 'goal' ? 'project' : 'task'
   let next = addNode(goal, { title: '', type })
   const newId = lastNodeId(next)
-  next = addEdge(next, selected, newId)
+  next = addEdge(next, newId, selected)
   setGoal(next)
   startEditing(newId, true)
   ensureVisible(newId)
@@ -52,10 +52,10 @@ function createParallel() {
   const selected = appState.selectedId
   if (!selected || selected === 'root') return
   const current = goal.nodes.find(n => n.id === selected)
-  const preds = predecessorsOf(goal, selected)
+  const parents = successorsOf(goal, selected)
   let next = addNode(goal, { title: '', type: current.type })
   const newId = lastNodeId(next)
-  for (const pred of preds) next = addEdge(next, pred.id, newId)
+  for (const parent of parents) next = addEdge(next, newId, parent.id)
   setGoal(next)
   startEditing(newId, true)
   ensureVisible(newId)
@@ -226,17 +226,17 @@ function flashRed(nodeId) {
 }
 
 function primaryParentOf(goal, id, visible) {
-  const edge = goal.edges.find(e => e.to === id && visible.has(e.from))
-  return edge ? edge.from : null
+  const edge = goal.edges.find(e => e.from === id && visible.has(e.to))
+  return edge ? edge.to : null
 }
 
 // visible tree-children of parentId (nodes whose primary parent is parentId),
 // in edge order — which is also their vertical order in the auto layout
 function treeSiblings(goal, parentId, visible) {
   return goal.edges
-    .filter(e => e.from === parentId && visible.has(e.to)
-      && primaryParentOf(goal, e.to, visible) === parentId)
-    .map(e => e.to)
+    .filter(e => e.to === parentId && visible.has(e.from)
+      && primaryParentOf(goal, e.from, visible) === parentId)
+    .map(e => e.from)
 }
 
 // While dragging a tree node, reorder it among its siblings as its y crosses
@@ -336,10 +336,7 @@ function startEdgeDrag(e, fromId) {
       flashRed(toId)
       return
     }
-    const next = updateEdge(addEdge(appState.goal, fromId, toId), fromId, toId, {
-      visualDirection: 'forward'
-    })
-    setGoal(next)
+    setGoal(addEdge(appState.goal, fromId, toId))
   }
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)

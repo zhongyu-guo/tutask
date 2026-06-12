@@ -158,7 +158,7 @@ test('backspace deletes the selected edge without removing nodes', async ({ page
   await expect(page.locator('#edges .edge')).toHaveCount(0)
 })
 
-test('legacy rendered edge arrow keeps the original direction', async ({ page }) => {
+test('rendered edge arrow points from child to parent', async ({ page }) => {
   await page.locator('.node[data-id="root"] .card').click()
   await page.keyboard.press('Tab')
   await page.locator('.title-input').fill('A')
@@ -179,8 +179,8 @@ test('legacy rendered edge arrow keeps the original direction', async ({ page })
       childRightX: parseFloat(child.style.left) + 210
     }
   })
+  expect(metrics.startX).toBeGreaterThan(metrics.rootX)
   expect(metrics.startX).toBeLessThan(metrics.childX)
-  expect(metrics.startX).toBeLessThan(metrics.childRightX)
   expect(metrics.endX).toBeGreaterThan(metrics.rootX)
   expect(metrics.endX).toBeLessThan(metrics.startX)
 })
@@ -207,12 +207,13 @@ test('saved positions on connected nodes are normalized back into auto layout', 
       id: 'g',
       goal: {
         title: 'G',
+        edgeDirection: 'child-to-parent',
         nodes: [
           node('root', 'G', 0, 0),
           node('a', 'A', 420, 0),
           node('b', 'B', 80, 120)
         ],
-        edges: [{ from: 'a', to: 'b', visualDirection: 'forward' }]
+        edges: [{ from: 'b', to: 'a' }]
       }
     }]
   })
@@ -235,10 +236,10 @@ test('saved positions on connected nodes are normalized back into auto layout', 
       saved
     }
   })
-  expect(metrics.fromId).toBe('a')
-  expect(metrics.toId).toBe('b')
-  expect(metrics.aX).toBeLessThan(metrics.bX)
-  expect(metrics.startX).toBeLessThan(metrics.endX)
+  expect(metrics.fromId).toBe('b')
+  expect(metrics.toId).toBe('a')
+  expect(metrics.bX).toBeGreaterThan(metrics.aX)
+  expect(metrics.startX).toBeGreaterThan(metrics.endX)
   expect(metrics.saved).toEqual([
     ['root', null, null],
     ['a', null, null],
@@ -320,16 +321,16 @@ test('dragging from A to B creates a source-to-target edge', async ({ page }) =>
       toId: edge.dataset.to,
       aId: a.dataset.id,
       bId: b.dataset.id,
-      visualDirection: JSON.parse(localStorage.getItem('taskdag-store'))
+      storedEdge: JSON.parse(localStorage.getItem('taskdag-store'))
         .goals[0].goal.edges.find(e => e.from === a.dataset.id && e.to === b.dataset.id)
-        ?.visualDirection
+        ?? null
     }
   })
   expect(metrics.fromId).toBe(metrics.aId)
   expect(metrics.toId).toBe(metrics.bId)
-  expect(metrics.visualDirection).toBe('forward')
-  expect(metrics.startX).toBeGreaterThan(metrics.aX)
-  expect(metrics.endX).toBe(metrics.bX)
+  expect(metrics.storedEdge).toMatchObject({ from: metrics.aId, to: metrics.bId })
+  expect(metrics.storedEdge.visualDirection).toBeUndefined()
+  expect(metrics.startX).toBeGreaterThan(metrics.endX)
 })
 
 test('ancestor collapse hides an already-collapsed child node', async ({ page }) => {
