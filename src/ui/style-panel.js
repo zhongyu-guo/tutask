@@ -3,15 +3,37 @@ import { appState, setGoal } from './state.js'
 
 // Floating popup for editing fill / border colors. A single instance lives in
 // <body>, so node re-renders never destroy it while it is open.
+// Colors are a fixed swatch set (black/white/gray/red/yellow/blue/green):
+// fills use soft tints so text stays readable, strokes use strong tones.
+
+const FILL_SWATCHES = [
+  { name: '白', value: '#ffffff' },
+  { name: '灰', value: '#eef1f4' },
+  { name: '红', value: '#fdeaea' },
+  { name: '黄', value: '#fdf4d7' },
+  { name: '蓝', value: '#e4eefe' },
+  { name: '绿', value: '#e6f6ec' },
+  { name: '黑', value: '#2b3038' }
+]
+
+const STROKE_SWATCHES = [
+  { name: '黑', value: '#2b3038' },
+  { name: '白', value: '#ffffff' },
+  { name: '灰', value: '#9aa2ad' },
+  { name: '红', value: '#dd4f4f' },
+  { name: '黄', value: '#e8a93c' },
+  { name: '蓝', value: '#3b82f6' },
+  { name: '绿', value: '#34a853' }
+]
 
 let panel = null
 let target = null // { kind: 'node', id } | { kind: 'edge', from, to }
 
-function rgbToHex(rgb) {
-  const m = rgb.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/)
-  if (!m) return '#ffffff'
-  return '#' + [m[1], m[2], m[3]]
-    .map(v => Number(v).toString(16).padStart(2, '0')).join('')
+function swatchButtons(group, swatches) {
+  return swatches.map(s =>
+    `<button class="sp-swatch" data-group="${group}" data-color="${s.value}"
+       title="${s.name}" style="background:${s.value}"></button>`
+  ).join('')
 }
 
 function ensurePanel() {
@@ -21,36 +43,41 @@ function ensurePanel() {
   panel.hidden = true
   panel.innerHTML = `
     <div class="sp-title"></div>
-    <label class="sp-row sp-fill">填充 <input type="color" class="sp-fill-input"></label>
-    <label class="sp-row sp-stroke"><span class="sp-stroke-label">边框</span> <input type="color" class="sp-stroke-input"></label>
+    <div class="sp-row sp-fill">
+      <span class="sp-label">填充</span>
+      <div class="sp-swatches">${swatchButtons('fill', FILL_SWATCHES)}</div>
+    </div>
+    <div class="sp-row sp-stroke">
+      <span class="sp-label sp-stroke-label">边框</span>
+      <div class="sp-swatches">${swatchButtons('stroke', STROKE_SWATCHES)}</div>
+    </div>
     <div class="sp-actions">
       <button class="sp-reset">重置</button>
       <button class="sp-close">关闭</button>
     </div>`
   document.body.appendChild(panel)
 
-  panel.querySelector('.sp-fill-input').addEventListener('input', e => {
-    if (targetExists() && target.kind === 'node') {
-      setGoal(updateNode(appState.goal, target.id, { fill: e.target.value }))
-    }
-  })
-  panel.querySelector('.sp-stroke-input').addEventListener('input', e => {
-    if (!targetExists()) return
-    if (target.kind === 'node') {
-      setGoal(updateNode(appState.goal, target.id, { stroke: e.target.value }))
+  panel.addEventListener('click', e => {
+    const btn = e.target.closest('.sp-swatch')
+    if (!btn || !targetExists()) return
+    const color = btn.dataset.color
+    if (btn.dataset.group === 'fill') {
+      setGoal(updateNode(appState.goal, target.id, { fill: color }))
+    } else if (target.kind === 'node') {
+      setGoal(updateNode(appState.goal, target.id, { stroke: color }))
     } else {
-      setGoal(updateEdge(appState.goal, target.from, target.to, { color: e.target.value }))
+      setGoal(updateEdge(appState.goal, target.from, target.to, { color }))
     }
+    syncSelection()
   })
   panel.querySelector('.sp-reset').addEventListener('click', () => {
     if (!targetExists()) return
     if (target.kind === 'node') {
       setGoal(updateNode(appState.goal, target.id, { fill: null, stroke: null }))
-      syncInputsFromNode(target.id)
     } else {
       setGoal(updateEdge(appState.goal, target.from, target.to, { color: null }))
-      syncInputsFromEdge()
     }
+    syncSelection()
   })
   panel.querySelector('.sp-close').addEventListener('click', closeStylePanel)
 
@@ -73,18 +100,24 @@ function targetExists() {
   return exists
 }
 
-function syncInputsFromNode(id) {
-  const card = document.querySelector(`.node[data-id="${id}"] .card`)
-  if (!card) return
-  const cs = getComputedStyle(card)
-  panel.querySelector('.sp-fill-input').value = rgbToHex(cs.backgroundColor)
-  panel.querySelector('.sp-stroke-input').value = rgbToHex(cs.borderTopColor)
-}
-
-function syncInputsFromEdge() {
-  const edge = appState.goal.edges.find(e => e.from === target.from && e.to === target.to)
-  const fallback = getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()
-  panel.querySelector('.sp-stroke-input').value = edge?.color ?? (fallback || '#5f6b7c')
+// highlight the swatches matching the target's current custom colors
+function syncSelection() {
+  if (!target) return
+  let fill = null
+  let stroke = null
+  if (target.kind === 'node') {
+    const node = appState.goal.nodes.find(n => n.id === target.id)
+    fill = node?.fill ?? null
+    stroke = node?.stroke ?? null
+  } else {
+    const edge = appState.goal.edges.find(e => e.from === target.from && e.to === target.to)
+    stroke = edge?.color ?? null
+  }
+  panel.querySelectorAll('.sp-swatch').forEach(btn => {
+    const current = btn.dataset.group === 'fill' ? fill : stroke
+    btn.classList.toggle('active',
+      current !== null && btn.dataset.color.toLowerCase() === current.toLowerCase())
+  })
 }
 
 function show(x, y, title, { withFill, strokeLabel }) {
@@ -105,13 +138,13 @@ export function openNodeStylePanel(id, x, y) {
   if (!node) return
   target = { kind: 'node', id }
   show(x, y, node.title || '（未命名）', { withFill: true, strokeLabel: '边框' })
-  syncInputsFromNode(id)
+  syncSelection()
 }
 
 export function openEdgeStylePanel(from, to, x, y) {
   target = { kind: 'edge', from, to }
   show(x, y, '连线样式', { withFill: false, strokeLabel: '线条' })
-  syncInputsFromEdge()
+  syncSelection()
 }
 
 export function closeStylePanel() {

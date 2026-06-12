@@ -9,7 +9,7 @@
   --todo: #aab2bd;
   --doing: #3b82f6;
   --done: #22c55e;
-  --ready: #f0b429;
+  --ready: #d8b75e;
   --danger: #ef4444;
   --project: #6366f1;
   --goal: #0f172a;
@@ -103,10 +103,7 @@ body {
 .node.doing .card { border-color: var(--doing); box-shadow: 0 1px 6px rgba(59, 130, 246, 0.25); }
 .node.done .card { border-color: var(--done); background: #f2fbf5; }
 .node.done .title { color: var(--muted); text-decoration: line-through; }
-.node.ready .card {
-  border-color: var(--ready);
-  box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.25), 0 1px 6px rgba(240, 180, 41, 0.4);
-}
+.node.ready .card { border-color: var(--ready); }
 .node.selected .card { outline: 3px solid rgba(59, 130, 246, 0.45); outline-offset: 2px; }
 .node.project .card { border-width: 3px; border-color: var(--project); }
 .node.project .title { font-weight: 700; color: var(--project); }
@@ -192,11 +189,16 @@ body {
 }
 #stylePanel .sp-row {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin: 6px 0; color: var(--muted); cursor: pointer;
+  gap: 10px; margin: 6px 0; color: var(--muted);
 }
-#stylePanel input[type="color"] {
-  width: 44px; height: 26px; padding: 1px; border: 1px solid var(--border);
-  border-radius: 6px; background: #fff; cursor: pointer;
+#stylePanel .sp-swatches { display: flex; gap: 5px; }
+#stylePanel .sp-swatch {
+  width: 20px; height: 20px; padding: 0; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 50%;
+}
+#stylePanel .sp-swatch:hover { transform: scale(1.15); }
+#stylePanel .sp-swatch.active {
+  outline: 2px solid var(--doing); outline-offset: 1px;
 }
 #stylePanel .sp-actions { display: flex; gap: 6px; margin-top: 8px; }
 #stylePanel .sp-actions button {
