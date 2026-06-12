@@ -146,9 +146,6 @@ export function render() {
     if (titleEl) titleEl.textContent = node.title || '（未命名）'
     const inputEl = el.querySelector('.title-input')
     if (inputEl) inputEl.value = node.title
-    const cardEl = el.querySelector('.card')
-    if (isHexColor(node.fill)) cardEl.style.background = node.fill
-    if (isHexColor(node.stroke)) cardEl.style.borderColor = node.stroke
     layer.appendChild(el)
   }
 
