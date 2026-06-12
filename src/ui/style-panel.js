@@ -1,23 +1,10 @@
 import { updateNode, updateEdge } from '../core/model.js'
-import { successorsOf } from '../core/graph.js'
-import { appState, setGoal, selectNode } from './state.js'
-import { ensureVisible } from './render.js'
+import { appState, setGoal } from './state.js'
 
-// Floating popup combining task details (description / status / hours /
-// deadline / prerequisites) with fill & border colors. A single instance
-// lives in <body> above nodes and edges, so re-renders never destroy it.
-// Colors are a fixed swatch set (black/white/gray/red/yellow/blue/green):
-// fills use soft tints so text stays readable, strokes use strong tones.
-
-const FILL_SWATCHES = [
-  { name: '白', value: '#ffffff' },
-  { name: '灰', value: '#eef1f4' },
-  { name: '红', value: '#fdeaea' },
-  { name: '黄', value: '#fdf4d7' },
-  { name: '蓝', value: '#e4eefe' },
-  { name: '绿', value: '#e6f6ec' },
-  { name: '黑', value: '#2b3038' }
-]
+// Floating popup: task details (description / status / hours / deadline) for
+// nodes, line color for edges. A single instance lives in <body> above nodes
+// and edges, so re-renders never destroy it. Node appearance follows status;
+// only edges get a color choice, from a fixed swatch set.
 
 const STROKE_SWATCHES = [
   { name: '黑', value: '#2b3038' },
@@ -49,10 +36,6 @@ function ensurePanel() {
   panel.innerHTML = `
     <div class="sp-title"></div>
     <div class="sp-detail">
-      <div class="sp-section sp-prereqs">
-        <div class="sp-label-row">前序步骤</div>
-        <div class="sp-prereq-list"></div>
-      </div>
       <div class="sp-section">
         <textarea class="f-description" placeholder="任务描述…"></textarea>
         <div class="sp-field-row">
@@ -65,12 +48,8 @@ function ensurePanel() {
         <input class="f-deadline" type="date">
       </div>
     </div>
-    <div class="sp-row sp-fill">
-      <span class="sp-label">填充</span>
-      <div class="sp-swatches">${swatchButtons('fill', FILL_SWATCHES)}</div>
-    </div>
     <div class="sp-row sp-stroke">
-      <span class="sp-label sp-stroke-label">边框</span>
+      <span class="sp-label">线条</span>
       <div class="sp-swatches">${swatchButtons('stroke', STROKE_SWATCHES)}</div>
     </div>
     <div class="sp-actions">
@@ -80,23 +59,9 @@ function ensurePanel() {
   document.body.appendChild(panel)
 
   panel.addEventListener('click', e => {
-    const prereq = e.target.closest('.prereq-item')
-    if (prereq) {
-      closeStylePanel()
-      selectNode(prereq.dataset.target)
-      ensureVisible(prereq.dataset.target)
-      return
-    }
     const btn = e.target.closest('.sp-swatch')
-    if (!btn || !targetExists()) return
-    const color = btn.dataset.color
-    if (btn.dataset.group === 'fill') {
-      setGoal(updateNode(appState.goal, target.id, { fill: color }))
-    } else if (target.kind === 'node') {
-      setGoal(updateNode(appState.goal, target.id, { stroke: color }))
-    } else {
-      setGoal(updateEdge(appState.goal, target.from, target.to, { color }))
-    }
+    if (!btn || !targetExists() || target.kind !== 'edge') return
+    setGoal(updateEdge(appState.goal, target.from, target.to, { color: btn.dataset.color }))
     syncSelection()
   })
 
@@ -107,7 +72,6 @@ function ensurePanel() {
       setGoal(updateNode(appState.goal, id, { description: e.target.value }))
     } else if (e.target.classList.contains('f-status')) {
       setGoal(updateNode(appState.goal, id, { status: e.target.value }))
-      syncPrereqs()
     } else if (e.target.classList.contains('f-hours')) {
       const value = e.target.value === '' ? null : Number(e.target.value)
       setGoal(updateNode(appState.goal, id, { estimatedHours: value }))
@@ -117,12 +81,8 @@ function ensurePanel() {
   })
 
   panel.querySelector('.sp-reset').addEventListener('click', () => {
-    if (!targetExists()) return
-    if (target.kind === 'node') {
-      setGoal(updateNode(appState.goal, target.id, { fill: null, stroke: null }))
-    } else {
-      setGoal(updateEdge(appState.goal, target.from, target.to, { color: null }))
-    }
+    if (!targetExists() || target.kind !== 'edge') return
+    setGoal(updateEdge(appState.goal, target.from, target.to, { color: null }))
     syncSelection()
   })
   panel.querySelector('.sp-close').addEventListener('click', closeStylePanel)
@@ -146,40 +106,14 @@ function targetExists() {
   return exists
 }
 
-// highlight the swatches matching the target's current custom colors
+// highlight the swatch matching the edge's current custom color
 function syncSelection() {
-  if (!target) return
-  let fill = null
-  let stroke = null
-  if (target.kind === 'node') {
-    const node = appState.goal.nodes.find(n => n.id === target.id)
-    fill = node?.fill ?? null
-    stroke = node?.stroke ?? null
-  } else {
-    const edge = appState.goal.edges.find(e => e.from === target.from && e.to === target.to)
-    stroke = edge?.color ?? null
-  }
+  if (!target || target.kind !== 'edge') return
+  const edge = appState.goal.edges.find(e => e.from === target.from && e.to === target.to)
+  const stroke = edge?.color ?? null
   panel.querySelectorAll('.sp-swatch').forEach(btn => {
-    const current = btn.dataset.group === 'fill' ? fill : stroke
     btn.classList.toggle('active',
-      current !== null && btn.dataset.color.toLowerCase() === current.toLowerCase())
-  })
-}
-
-function syncPrereqs() {
-  const list = panel.querySelector('.sp-prereq-list')
-  const preds = successorsOf(appState.goal, target.id)
-  if (preds.length === 0) {
-    list.innerHTML = '<div class="prereq-empty">（无前序，可直接开始）</div>'
-    return
-  }
-  list.innerHTML = preds.map(p =>
-    `<div class="prereq-item" data-target="${p.id}">
-      <span class="dot ${p.status}"></span><span class="prereq-title"></span>
-    </div>`).join('')
-  list.querySelectorAll('.prereq-item').forEach(item => {
-    const pred = appState.goal.nodes.find(n => n.id === item.dataset.target)
-    item.querySelector('.prereq-title').textContent = pred?.title || '（未命名）'
+      stroke !== null && btn.dataset.color.toLowerCase() === stroke.toLowerCase())
   })
 }
 
@@ -194,8 +128,8 @@ function show(x, y, title, { isNode }) {
   const p = ensurePanel()
   p.querySelector('.sp-title').textContent = title
   p.querySelector('.sp-detail').hidden = !isNode
-  p.querySelector('.sp-fill').hidden = !isNode
-  p.querySelector('.sp-stroke-label').textContent = isNode ? '边框' : '线条'
+  p.querySelector('.sp-stroke').hidden = isNode
+  p.querySelector('.sp-reset').hidden = isNode
   p.hidden = false
   const margin = 8
   const w = p.offsetWidth
@@ -210,8 +144,6 @@ export function openNodeStylePanel(id, x, y) {
   target = { kind: 'node', id }
   show(x, y, node.title || '（未命名）', { isNode: true })
   syncFields(node)
-  syncPrereqs()
-  syncSelection()
 }
 
 export function openEdgeStylePanel(from, to, x, y) {
