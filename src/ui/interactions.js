@@ -8,6 +8,7 @@ import {
   appState, setGoal, setStore, selectNode, startEditing, stopEditing, rerender
 } from './state.js'
 import { render, ensureVisible, updateTransform, NODE_W, NODE_H } from './render.js'
+import { reorderChildEdges, reorderEdgesByPlacement } from '../core/layout.js'
 import { bindFile, unbindFile } from './storage.js'
 import { openNodeStylePanel, openEdgeStylePanel, closeStylePanel } from './style-panel.js'
 
@@ -196,11 +197,50 @@ function flashRed(nodeId) {
   setTimeout(() => el.classList.remove('flash-red'), 900)
 }
 
+function primaryParentOf(goal, id, visible) {
+  const edge = goal.edges.find(e => e.to === id && visible.has(e.from))
+  return edge ? edge.from : null
+}
+
+// visible tree-children of parentId (nodes whose primary parent is parentId),
+// in edge order — which is also their vertical order in the auto layout
+function treeSiblings(goal, parentId, visible) {
+  return goal.edges
+    .filter(e => e.from === parentId && visible.has(e.to)
+      && primaryParentOf(goal, e.to, visible) === parentId)
+    .map(e => e.to)
+}
+
+// While dragging a tree node, reorder it among its siblings as its y crosses
+// sibling rows. Returns true when a reorder happened (and the DOM re-rendered).
+function realignDuringDrag(id, dragY) {
+  const goal = appState.goal
+  const visible = appState.lastVisible
+  const parent = primaryParentOf(goal, id, visible)
+  if (!parent) return false
+  const siblings = treeSiblings(goal, parent, visible)
+  if (siblings.length < 2) return false
+  const others = siblings.filter(s => s !== id)
+  let index = others.length
+  for (let i = 0; i < others.length; i++) {
+    if (dragY < (appState.lastPositions.get(others[i])?.y ?? 0)) { index = i; break }
+  }
+  const desired = [...others.slice(0, index), id, ...others.slice(index)]
+  if (desired.every((s, i) => s === siblings[i])) return false
+  setGoal(reorderChildEdges(goal, parent, desired))
+  return true
+}
+
 function startNodeDrag(e, nodeEl) {
   const id = nodeEl.dataset.id
   const startMouse = screenToWorld(e.clientX, e.clientY)
   const startLeft = parseFloat(nodeEl.style.left)
   const startTop = parseFloat(nodeEl.style.top)
+  // tree nodes live-realign and snap back into the layout on drop;
+  // root and floating (orphan) nodes keep free manual placement
+  const isTreeNode = id !== 'root'
+    && primaryParentOf(appState.goal, id, appState.lastVisible) !== null
+  let el = nodeEl
   let moved = false
 
   function onMove(ev) {
@@ -209,18 +249,27 @@ function startNodeDrag(e, nodeEl) {
     const dy = current.y - startMouse.y
     if (!moved && Math.hypot(dx, dy) * appState.zoom < 4) return
     moved = true
-    nodeEl.style.left = startLeft + dx + 'px'
-    nodeEl.style.top = startTop + dy + 'px'
+    if (isTreeNode && realignDuringDrag(id, startTop + dy)) {
+      el = document.querySelector(`.node[data-id="${id}"]`) ?? el
+    }
+    el.style.left = startLeft + dx + 'px'
+    el.style.top = startTop + dy + 'px'
   }
   function onUp(ev) {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
     if (moved) {
       const current = screenToWorld(ev.clientX, ev.clientY)
-      setGoal(updateNode(appState.goal, id, {
-        x: startLeft + (current.x - startMouse.x),
-        y: startTop + (current.y - startMouse.y)
-      }))
+      const y = startTop + (current.y - startMouse.y)
+      if (isTreeNode) {
+        realignDuringDrag(id, y)
+        // drop the manual position so the node snaps into its layout slot
+        setGoal(updateNode(appState.goal, id, { x: null, y: null }))
+      } else {
+        setGoal(updateNode(appState.goal, id, {
+          x: startLeft + (current.x - startMouse.x), y
+        }))
+      }
     } else {
       selectNode(id)
       openNodeStylePanel(id, ev.clientX, ev.clientY)
@@ -338,8 +387,10 @@ async function handleBindFile() {
 }
 
 function resetLayout() {
-  if (!window.confirm('清除所有手动调整的位置，恢复自动布局？')) return
-  let next = appState.goal
+  if (!window.confirm('清除所有手动调整的位置，恢复自动布局？（同层节点保持当前的上下顺序）')) return
+  // persist the user's current vertical ordering into edge order first,
+  // so the auto layout keeps siblings where the user placed them
+  let next = reorderEdgesByPlacement(appState.goal, appState.lastPositions)
   for (const node of next.nodes) {
     if (node.x !== null || node.y !== null) {
       next = updateNode(next, node.id, { x: null, y: null })

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { createGoal, addNode, addEdge, updateNode } from '../src/core/model.js'
-import { computeLayers, autoLayout, resolvePositions } from '../src/core/layout.js'
+import {
+  computeLayers, autoLayout, resolvePositions,
+  reorderChildEdges, reorderEdgesByPlacement
+} from '../src/core/layout.js'
 
 // Diamond: root → A; A → B; A → C; B → D; C → D
 function buildDiamond() {
@@ -141,6 +144,58 @@ describe('autoLayout (outline tree style)', () => {
     const pos = autoLayout(goal, allVisible(goal), { gapX: 260, gapY: 90 })
     expect(pos.get(id).x).toBe(260)
     expect(pos.get(id).y).toBeGreaterThan(pos.get('root').y)
+  })
+})
+
+describe('reorderChildEdges', () => {
+  it('reorders one parent’s outgoing edges to match the given child order, immutably', () => {
+    const { goal, ids } = buildDiamond()
+    const next = reorderChildEdges(goal, ids.A, [ids.C, ids.B])
+    // A's edges flipped, others untouched
+    const aKids = next.edges.filter(e => e.from === ids.A).map(e => e.to)
+    expect(aKids).toEqual([ids.C, ids.B])
+    expect(next.edges.filter(e => e.from !== ids.A))
+      .toEqual(goal.edges.filter(e => e.from !== ids.A))
+    // original goal not mutated
+    expect(goal.edges.filter(e => e.from === ids.A).map(e => e.to)).toEqual([ids.B, ids.C])
+  })
+
+  it('keeps each group edge in the from-group’s original slots', () => {
+    const { goal, ids } = buildDiamond()
+    const next = reorderChildEdges(goal, ids.A, [ids.C, ids.B])
+    // global slot indices of A's edges are unchanged (only contents swapped)
+    const slots = g => g.edges.map((e, i) => (e.from === ids.A ? i : null)).filter(i => i !== null)
+    expect(slots(next)).toEqual(slots(goal))
+  })
+})
+
+describe('reorderEdgesByPlacement', () => {
+  it('orders siblings by their current vertical position', () => {
+    // root → A, root → E in edge order; user moved E above A
+    let goal = createGoal('G')
+    const ids = {}
+    for (const name of ['A', 'E']) {
+      goal = addNode(goal, { title: name, type: 'task' })
+      ids[name] = goal.nodes[goal.nodes.length - 1].id
+    }
+    goal = addEdge(goal, 'root', ids.A)
+    goal = addEdge(goal, 'root', ids.E)
+    const positions = new Map([
+      ['root', { x: 0, y: 0 }],
+      [ids.A, { x: 260, y: 200 }],
+      [ids.E, { x: 260, y: 10 }]
+    ])
+    const next = reorderEdgesByPlacement(goal, positions)
+    expect(next.edges.map(e => e.to)).toEqual([ids.E, ids.A])
+    // autoLayout now puts E on top
+    const pos = autoLayout(next, allVisible(next), { gapX: 260, gapY: 90 })
+    expect(pos.get(ids.E).y).toBeLessThan(pos.get(ids.A).y)
+  })
+
+  it('keeps edge order stable for nodes without a known position', () => {
+    const { goal, ids } = buildDiamond()
+    const next = reorderEdgesByPlacement(goal, new Map())
+    expect(next.edges).toEqual(goal.edges)
   })
 })
 

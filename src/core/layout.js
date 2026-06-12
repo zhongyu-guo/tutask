@@ -90,6 +90,33 @@ export function autoLayout(goal, visibleIds, opts = {}) {
   return pos
 }
 
+// Sibling order in autoLayout follows edge order. To make layout honor the
+// user's vertical placement, rewrite each parent's outgoing edges sorted by
+// the child's current y. Edges keep their group's original slots in the array,
+// so edges from different parents never swap relative order.
+export function reorderChildEdges(goal, parentId, orderedChildIds) {
+  const rank = new Map(orderedChildIds.map((id, i) => [id, i]))
+  const group = goal.edges.filter(e => e.from === parentId && rank.has(e.to))
+  if (group.length < 2) return goal
+  const sorted = [...group].sort((a, b) => rank.get(a.to) - rank.get(b.to))
+  let i = 0
+  const edges = goal.edges.map(e =>
+    (e.from === parentId && rank.has(e.to)) ? sorted[i++] : e)
+  return { ...goal, edges }
+}
+
+export function reorderEdgesByPlacement(goal, positions) {
+  const parents = [...new Set(goal.edges.map(e => e.from))]
+  return parents.reduce((acc, parent) => {
+    const kids = acc.edges.filter(e => e.from === parent).map(e => e.to)
+    const ordered = kids
+      .map((id, i) => ({ id, i, y: positions.get(id)?.y }))
+      .sort((a, b) => (a.y ?? Infinity) - (b.y ?? Infinity) || a.i - b.i)
+      .map(k => k.id)
+    return reorderChildEdges(acc, parent, ordered)
+  }, goal)
+}
+
 export function resolvePositions(goal, autoPos) {
   const resolved = new Map()
   for (const node of goal.nodes) {
