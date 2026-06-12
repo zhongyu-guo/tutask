@@ -175,8 +175,9 @@ function onKeydown(e) {
     case 'd': case 'D': {
       const id = appState.selectedId
       if (id) {
-        const node = appState.goal.nodes.find(n => n.id === id)
-        setGoal(updateNode(appState.goal, id, { detailOpen: !node.detailOpen }))
+        const card = document.querySelector(`.node[data-id="${id}"] .card`)
+        const rect = card?.getBoundingClientRect()
+        if (rect) openNodeStylePanel(id, rect.right, rect.top)
       }
       break
     }
@@ -429,14 +430,13 @@ export function setupInteractions() {
       startEdgeDrag(e, e.target.dataset.id)
       return
     }
-    if (e.target.closest('.detail-panel')) return
     if (isTextTarget(e.target) || e.target.tagName === 'BUTTON') return
     const nodeEl = e.target.closest('.node')
     if (nodeEl) startNodeDrag(e, nodeEl)
   })
 
   nodes.addEventListener('dblclick', e => {
-    if (isTextTarget(e.target) || e.target.closest('.detail-panel')) return
+    if (isTextTarget(e.target)) return
     const card = e.target.closest('.card')
     if (card) {
       closeStylePanel() // the first click of the dblclick opened it
@@ -451,34 +451,6 @@ export function setupInteractions() {
       const node = appState.goal.nodes.find(n => n.id === id)
       setGoal(updateNode(appState.goal, id, { collapsed: !node.collapsed }))
       return
-    }
-    const detailBtn = e.target.closest('.detail-btn')
-    if (detailBtn) {
-      const id = detailBtn.dataset.id
-      const node = appState.goal.nodes.find(n => n.id === id)
-      appState.selectedId = id
-      setGoal(updateNode(appState.goal, id, { detailOpen: !node.detailOpen }))
-      return
-    }
-    const prereq = e.target.closest('.prereq-item')
-    if (prereq) {
-      selectNode(prereq.dataset.target)
-      ensureVisible(prereq.dataset.target)
-    }
-  })
-
-  nodes.addEventListener('change', e => {
-    const id = e.target.dataset.id
-    if (!id) return
-    if (e.target.classList.contains('f-description')) {
-      setGoal(updateNode(appState.goal, id, { description: e.target.value }))
-    } else if (e.target.classList.contains('f-status')) {
-      setGoal(updateNode(appState.goal, id, { status: e.target.value }))
-    } else if (e.target.classList.contains('f-hours')) {
-      const value = e.target.value === '' ? null : Number(e.target.value)
-      setGoal(updateNode(appState.goal, id, { estimatedHours: value }))
-    } else if (e.target.classList.contains('f-deadline')) {
-      setGoal(updateNode(appState.goal, id, { deadline: e.target.value || null }))
     }
   })
 
