@@ -351,3 +351,29 @@ test('ancestor collapse hides an already-collapsed child node', async ({ page })
   await expect(page.locator('.node .title')).toHaveText(['双击编辑目标名称', 'A'])
   await expect(page.locator('.node.selected .collapse-btn')).toHaveText('2▸')
 })
+
+test('double-click renames a tall multi-line node without the edit closing itself', async ({ page }) => {
+  // a long title wraps to several lines, making the card taller than the
+  // single-line edit input. Entering edit mode shrinks the card, and a stray
+  // height-measurement re-render used to tear the focused input back out,
+  // committing instantly so the rename appeared to do nothing.
+  await page.locator('.node[data-id="root"] .card').dblclick()
+  await page.locator('.title-input').fill('创造有需求的东西，解决他们的问题，build：做成事情赚到钱')
+  await page.keyboard.press('Enter')
+
+  // give the goal several predecessors so it matches the reported layout
+  await page.locator('.node[data-id="root"] .card').click()
+  for (const name of ['A', 'B', 'C']) {
+    await page.keyboard.press('Tab')
+    await page.locator('.title-input').fill(name)
+    await page.keyboard.press('Enter')
+  }
+
+  await page.locator('.node[data-id="root"] .card').dblclick()
+  await expect(page.locator('.title-input')).toBeVisible()
+  await page.waitForTimeout(200) // outlast the async height-measurement re-render
+  await expect(page.locator('.title-input')).toBeVisible()
+  await page.locator('.title-input').fill('改名成功')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.node[data-id="root"] .title')).toHaveText('改名成功')
+})
