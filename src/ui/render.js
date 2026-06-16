@@ -189,9 +189,6 @@ function renderBadges(node) {
   if (node.deadline) {
     html += `<span class="badge deadline${isOverdue(node) ? ' overdue' : ''}">📅 ${node.deadline}</span>`
   }
-  if (node.estimatedHours) {
-    html += `<span class="badge">⏱ ${node.estimatedHours}h</span>`
-  }
   return html ? `<div class="badges">${html}</div>` : ''
 }
 

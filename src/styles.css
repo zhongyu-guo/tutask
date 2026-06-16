@@ -289,16 +289,11 @@ body {
 #stylePanel .sp-title:focus { border-color: var(--focus); outline: 2px solid rgba(59, 130, 246, 0.18); }
 #stylePanel [hidden] { display: none !important; }
 #stylePanel .sp-section { margin-bottom: 8px; }
-#stylePanel textarea.f-description {
-  width: 100%; min-height: 56px; resize: vertical; font-family: inherit;
-  font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; padding: 6px;
-}
-#stylePanel .sp-field-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+#stylePanel .sp-field-row { display: flex; flex-wrap: wrap; gap: 6px; }
 #stylePanel select, #stylePanel input {
   font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px;
 }
 #stylePanel select { flex: 1 1 108px; min-width: 0; }
-#stylePanel input.f-hours { width: 80px; }
 #stylePanel input.f-deadline { margin-top: 6px; width: 100%; }
 #stylePanel .sp-row {
   display: flex; align-items: center; justify-content: space-between;

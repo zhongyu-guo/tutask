@@ -2,7 +2,7 @@ import { updateNode, updateEdge } from '../core/model.js'
 import { appState, setGoal } from './state.js'
 import { setNodeTitleCommand } from './commands.js'
 
-// Floating popup: task details (description / status / hours / deadline) for
+// Floating popup: task details (status / deadline) for
 // nodes, line color for edges. A single instance lives in <body> above nodes
 // and edges, so re-renders never destroy it. Node appearance follows status;
 // only edges get a color choice, from a fixed swatch set.
@@ -41,7 +41,6 @@ function ensurePanel() {
     <input class="sp-title" aria-label="节点名称" placeholder="节点名称">
     <div class="sp-detail">
       <div class="sp-section">
-        <textarea class="f-description" placeholder="任务描述…"></textarea>
         <div class="sp-field-row">
           <select class="f-chain-status">
             ${['active', 'paused'].map(s =>
@@ -51,7 +50,6 @@ function ensurePanel() {
             ${['todo', 'doing', 'done'].map(s =>
               `<option value="${s}">${STATUS_LABEL[s]}</option>`).join('')}
           </select>
-          <input class="f-hours" type="number" min="0" step="0.5" placeholder="工时h">
         </div>
         <input class="f-deadline" type="date">
       </div>
@@ -77,15 +75,10 @@ function ensurePanel() {
     const id = target.id
     if (e.target.classList.contains('sp-title')) {
       updateNodeTitle(id, e.target.value)
-    } else if (e.target.classList.contains('f-description')) {
-      setGoal(updateNode(appState.goal, id, { description: e.target.value }))
     } else if (e.target.classList.contains('f-status')) {
       setGoal(updateNode(appState.goal, id, { status: e.target.value }))
     } else if (e.target.classList.contains('f-chain-status')) {
       setGoal(updateNode(appState.goal, id, { chainStatus: e.target.value }))
-    } else if (e.target.classList.contains('f-hours')) {
-      const value = e.target.value === '' ? null : Number(e.target.value)
-      setGoal(updateNode(appState.goal, id, { estimatedHours: value }))
     } else if (e.target.classList.contains('f-deadline')) {
       setGoal(updateNode(appState.goal, id, { deadline: e.target.value || null }))
     }
@@ -164,10 +157,8 @@ function syncSelection() {
 
 function syncFields(node) {
   panel.querySelector('.sp-title').value = node.title ?? ''
-  panel.querySelector('.f-description').value = node.description ?? ''
   panel.querySelector('.f-chain-status').value = node.chainStatus ?? 'active'
   panel.querySelector('.f-status').value = node.status
-  panel.querySelector('.f-hours').value = node.estimatedHours ?? ''
   panel.querySelector('.f-deadline').value = node.deadline ?? ''
 }
 
