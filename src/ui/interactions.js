@@ -1,7 +1,7 @@
 import {
-  addNode, updateNode, removeNode, addEdge, removeEdge, createGoal
+  updateNode, addEdge, removeEdge, createGoal
 } from '../core/model.js'
-import { predecessorsOf, successorsOf, wouldCreateCycle } from '../core/graph.js'
+import { predecessorsOf, wouldCreateCycle } from '../core/graph.js'
 import { exportJSON, importJSON } from '../core/serialize.js'
 import { addGoal, switchGoal, removeGoal, renameCurrentGoal } from '../core/store.js'
 import {
@@ -12,8 +12,11 @@ import { render, ensureVisible, updateTransform, autosizeTitleInput, centerVisib
 import { reorderChildEdges, reorderEdgesByPlacement } from '../core/layout.js'
 import { bindFile, unbindFile } from './storage.js'
 import { openNodeStylePanel, openEdgeStylePanel, closeStylePanel } from './style-panel.js'
+import {
+  createFloatingCommand, createParallelCommand, createSuccessorCommand,
+  cycleNodeStatusCommand, deleteNodesCommand, setNodeTitleCommand
+} from './commands.js'
 
-const STATUS_CYCLE = { todo: 'doing', doing: 'done', done: 'todo' }
 const INTERACTIONS_LAYOUT_DIRECTION_KEY = 'taskdag-layout-direction'
 
 function screenToWorld(clientX, clientY) {
@@ -40,10 +43,6 @@ function isComposingInput(e) {
   const ignoreNextEnter = textTarget && e.key === 'Enter' && e.target?.dataset?.ignoreNextEnter === 'true'
   if (ignoreNextEnter) delete e.target.dataset.ignoreNextEnter
   return e.isComposing || e.keyCode === 229 || composingTarget || ignoreNextEnter
-}
-
-function lastNodeId(goal) {
-  return goal.nodes[goal.nodes.length - 1].id
 }
 
 function activeSelectedNodeId() {
@@ -73,52 +72,27 @@ function activeSelectedNodeId() {
 // ---------- node creation ----------
 
 function createSuccessor() {
-  const goal = appState.goal
   const selected = activeSelectedNodeId()
-  if (!selected) return
-  const parent = goal.nodes.find(n => n.id === selected)
-  const type = parent.type === 'goal' ? 'project' : 'task'
-  let next = addNode(goal, { title: '', type })
-  const newId = lastNodeId(next)
-  next = addEdge(next, newId, selected)
-  setGoal(next)
-  startEditing(newId, true)
-  ensureVisible(newId)
+  const result = createSuccessorCommand(appState.goal, selected)
+  if (!result) return
+  setGoal(result.goal)
+  startEditing(result.nodeId, true)
+  ensureVisible(result.nodeId)
 }
 
 function createParallel() {
-  const goal = appState.goal
   const selected = activeSelectedNodeId()
-  if (!selected || selected === 'root') return
-  const current = goal.nodes.find(n => n.id === selected)
-  const parents = successorsOf(goal, selected)
-  let next = addNode(goal, { title: '', type: current.type })
-  const newId = lastNodeId(next)
-  for (const parent of parents) next = addEdge(next, newId, parent.id)
-  for (const parent of parents) {
-    const siblings = next.edges
-      .filter(e => e.to === parent.id)
-      .map(e => e.from)
-    const ordered = []
-    for (const id of siblings) {
-      if (id === newId) continue
-      ordered.push(id)
-      if (id === selected) ordered.push(newId)
-    }
-    if (!ordered.includes(newId)) ordered.push(newId)
-    next = reorderChildEdges(next, parent.id, ordered)
-  }
-  setGoal(next)
-  startEditing(newId, true)
-  ensureVisible(newId)
+  const result = createParallelCommand(appState.goal, selected)
+  if (!result) return
+  setGoal(result.goal)
+  startEditing(result.nodeId, true)
+  ensureVisible(result.nodeId)
 }
 
 function createFloating(worldPos) {
-  let next = addNode(appState.goal, { title: '', type: 'task' })
-  const newId = lastNodeId(next)
-  next = updateNode(next, newId, { x: worldPos.x, y: worldPos.y })
-  setGoal(next)
-  startEditing(newId, true)
+  const result = createFloatingCommand(appState.goal, worldPos)
+  setGoal(result.goal)
+  startEditing(result.nodeId, true)
 }
 
 function deleteSelected() {
@@ -130,7 +104,7 @@ function deleteSelected() {
   appState.selectedId = null
   appState.selectedIds.clear()
   appState.selectedEdge = null
-  setGoal(selected.reduce((goal, id) => removeNode(goal, id), appState.goal))
+  setGoal(deleteNodesCommand(appState.goal, selected))
 }
 
 function removeEdgePreservingPositions(goal, from, to) {
@@ -161,13 +135,11 @@ function commitEdit(input) {
   if (title === '' && wasNew) {
     appState.selectedId = null
     appState.selectedIds.clear()
-    setGoal(removeNode(appState.goal, id))
+    setGoal(deleteNodesCommand(appState.goal, [id]))
     return
   }
   if (title === '') { rerender(); return }
-  let next = updateNode(appState.goal, id, { title })
-  if (id === 'root') next = { ...next, title }
-  setGoal(next)
+  setGoal(setNodeTitleCommand(appState.goal, id, title))
 }
 
 function cancelEdit() {
@@ -177,7 +149,7 @@ function cancelEdit() {
   if (wasNew && id) {
     appState.selectedId = null
     appState.selectedIds.clear()
-    setGoal(removeNode(appState.goal, id))
+    setGoal(deleteNodesCommand(appState.goal, [id]))
     return
   }
   rerender()
@@ -253,10 +225,7 @@ function onKeydown(e) {
     case ' ': {
       e.preventDefault()
       const id = appState.selectedId
-      if (id && id !== 'root') {
-        const node = appState.goal.nodes.find(n => n.id === id)
-        setGoal(updateNode(appState.goal, id, { status: STATUS_CYCLE[node.status] }))
-      }
+      setGoal(cycleNodeStatusCommand(appState.goal, id))
       break
     }
     case 'd': case 'D': {

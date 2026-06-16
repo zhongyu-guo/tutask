@@ -1,3 +1,5 @@
+import { EDGE_DIRECTION, createNodeRecord, createRootNode } from './schema.js'
+
 let idCounter = 0
 
 export function genId() {
@@ -12,24 +14,14 @@ function findNode(goal, id) {
 export function createGoal(title) {
   return {
     title,
-    edgeDirection: 'child-to-parent',
-    nodes: [{
-      id: 'root', type: 'goal', title,
-      status: 'todo', chainStatus: 'active', description: '', estimatedHours: null, deadline: null,
-      x: null, y: null, collapsed: false, detailOpen: false,
-      fill: null, stroke: null
-    }],
+    edgeDirection: EDGE_DIRECTION,
+    nodes: [createRootNode(title)],
     edges: []
   }
 }
 
 export function addNode(goal, { title, type }) {
-  const node = {
-    id: genId(), type, title,
-    status: 'todo', chainStatus: 'active', description: '', estimatedHours: null, deadline: null,
-    x: null, y: null, collapsed: false, detailOpen: false,
-    fill: null, stroke: null
-  }
+  const node = createNodeRecord({ id: genId(), type, title })
   return { ...goal, nodes: [...goal.nodes, node] }
 }
 

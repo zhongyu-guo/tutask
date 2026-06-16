@@ -1,5 +1,6 @@
 import { updateNode, updateEdge } from '../core/model.js'
 import { appState, setGoal } from './state.js'
+import { setNodeTitleCommand } from './commands.js'
 
 // Floating popup: task details (description / status / hours / deadline) for
 // nodes, line color for edges. A single instance lives in <body> above nodes
@@ -137,9 +138,7 @@ function ensurePanel() {
 
 function updateNodeTitle(id, value) {
   const title = value.trim()
-  let next = updateNode(appState.goal, id, { title })
-  if (id === 'root') next = { ...next, title }
-  setGoal(next)
+  setGoal(setNodeTitleCommand(appState.goal, id, title))
 }
 
 // the target may vanish while the panel is open (node/edge deleted elsewhere)

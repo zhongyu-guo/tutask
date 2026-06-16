@@ -208,6 +208,10 @@ body {
 .node.doing .title { color: #9a3412; }
 .node.done .card { border-color: var(--active-border); background: #eaf8ef; }
 .node.done .title { color: #166534; text-decoration: none; }
+.node.ready .card {
+  border-color: #f0b429;
+  box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.18), 0 8px 20px rgba(240, 180, 41, 0.18);
+}
 .node.selected .card { outline: 3px solid rgba(59, 130, 246, 0.45); outline-offset: 2px; }
 .node.reparent-target .card { outline: 3px solid rgba(34, 197, 94, 0.48); outline-offset: 3px; }
 .node.project .card { border-width: 3px; }

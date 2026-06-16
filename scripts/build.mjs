@@ -1,37 +1,27 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import * as esbuild from 'esbuild'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-// dependency order matters: later files use names defined in earlier ones
-const MODULES = [
-  'src/core/model.js',
-  'src/core/graph.js',
-  'src/core/layout.js',
-  'src/core/serialize.js',
-  'src/core/store.js',
-  'src/ui/storage.js',
-  'src/ui/state.js',
-  'src/ui/render.js',
-  'src/ui/style-panel.js',
-  'src/ui/interactions.js',
-  'src/ui/main.js'
-]
-
-function stripModuleSyntax(source) {
-  return source
-    .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '')
-    .replace(/^export\s+\{[^}]*\}\s*$/gm, '')
-    .replace(/^export\s+/gm, '')
+async function bundleScript() {
+  const result = await esbuild.build({
+    absWorkingDir: root,
+    entryPoints: ['src/ui/main.js'],
+    bundle: true,
+    format: 'iife',
+    target: 'es2020',
+    charset: 'utf8',
+    legalComments: 'none',
+    write: false
+  })
+  return result.outputFiles[0].text
 }
 
-function build() {
-  const scriptParts = MODULES.map(file => {
-    const source = readFileSync(join(root, file), 'utf8')
-    return `// ===== ${file} =====\n${stripModuleSyntax(source)}`
-  })
-  const script = `<script>\n'use strict';\n(function () {\n${scriptParts.join('\n')}\n})();\n</script>`
+async function build() {
+  const bundledScript = await bundleScript()
+  const script = `<script>\n${bundledScript}\n</script>`
   const style = `<style>\n${readFileSync(join(root, 'src/styles.css'), 'utf8')}\n</style>`
 
   let html = readFileSync(join(root, 'src/index.html'), 'utf8')
@@ -47,4 +37,7 @@ function build() {
   process.stdout.write(`dist/index.html written (${(html.length / 1024).toFixed(1)} KB)\n`)
 }
 
-build()
+build().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})

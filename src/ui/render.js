@@ -1,4 +1,4 @@
-import { predecessorsOf, hiddenByCollapse, collapsedCount, nodeType } from '../core/graph.js'
+import { predecessorsOf, hiddenByCollapse, collapsedCount, nodeType, isReady } from '../core/graph.js'
 import { autoLayout, resolvePositions } from '../core/layout.js'
 import { appState } from './state.js'
 import { fileBound, boundFileName, fileApiAvailable } from './storage.js'
@@ -171,6 +171,7 @@ function renderEdges(svg, goal, positions, visible) {
 function nodeClasses(goal, node) {
   const classes = ['node', nodeType(goal, node), node.status]
   if ((node.chainStatus ?? 'active') === 'paused') classes.push('chain-paused')
+  if (isReady(goal, node.id)) classes.push('ready')
   if (appState.selectedIds.has(node.id)) classes.push('selected')
   if (isOverdue(node)) classes.push('overdue')
   return classes.join(' ')

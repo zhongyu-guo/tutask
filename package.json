@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "build": "node scripts/build.mjs",
     "watch": "node scripts/watch.mjs",
     "serve": "npx serve dist -l 4174"
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@vitest/coverage-v8": "^4.1.8",
+    "esbuild": "^0.28.1",
     "vitest": "^4.1.8"
   }
 }

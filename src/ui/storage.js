@@ -1,6 +1,7 @@
 import { migrateStore } from '../core/store.js'
 import { validateGoal } from '../core/serialize.js'
 import { normalizeLayoutGoal } from '../core/layout.js'
+import { normalizeGoal, normalizeStore } from '../core/schema.js'
 
 const KEY = 'taskdag-store'
 const LEGACY_KEY = 'taskdag-goal'
@@ -54,6 +55,7 @@ export function load() {
 }
 
 function normalizeStoreLayout(store, referenceStore = null) {
+  store = normalizeStore(store)
   const refs = new Map((referenceStore?.goals ?? []).map(entry => [entry.id, entry.goal]))
   return {
     ...store,
@@ -116,8 +118,9 @@ async function scanDir() {
     try {
       const goal = JSON.parse(await file.text())
       if (validateGoal(goal).valid) {
-        entries.push({ id: handle.name.slice(0, -5), goal: normalizeLayoutGoal(goal) })
-        dirSync.writtenText.set(handle.name, JSON.stringify(goal, null, 2))
+        const normalized = normalizeGoal(goal)
+        entries.push({ id: handle.name.slice(0, -5), goal: normalizeLayoutGoal(normalized) })
+        dirSync.writtenText.set(handle.name, JSON.stringify(normalized, null, 2))
       }
     } catch (error) {
       // skip unreadable/invalid files; they are left untouched on write

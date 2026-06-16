@@ -26,10 +26,15 @@
 ```bash
 npm install
 npm run build      # 产出 dist/index.html
-npm test           # core 单元测试 (Vitest)
-npx playwright test  # E2E
+npm test           # 单元测试 (Vitest)
+npm run test:e2e   # E2E (Playwright)
 npx serve src      # 开发模式（ESM 源码直跑）
 ```
+
+更多当前态说明：
+
+- [功能说明](docs/features.md)
+- [技术架构](docs/architecture.md)
 
 ## 快捷键
 
@@ -61,8 +66,8 @@ npx serve src      # 开发模式（ESM 源码直跑）
 
 ```
 src/core/   纯函数：数据模型、图算法（环检测/折叠可见性/可开始判定）、
-            分层布局（简化 Sugiyama）、JSON 校验 —— Vitest 覆盖 94%
-src/ui/     DOM/SVG 渲染与交互薄层
-scripts/    build.mjs 将模块内联为 dist/index.html 单文件
+            分层布局、schema/迁移、JSON 校验
+src/ui/     DOM/SVG 渲染、交互绑定、纯函数 command 层、浏览器存储
+scripts/    build.mjs 使用 esbuild bundle 后内联为 dist/index.html 单文件
 docs/plans/ 设计与实施文档
 ```
