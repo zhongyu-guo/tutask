@@ -167,25 +167,7 @@ export function render() {
   const goalNameInput = document.getElementById('goalNameInput')
   if (document.activeElement !== goalNameInput) goalNameInput.value = goal.title
 
-  const menu = document.getElementById('goalMenu')
-  menu.innerHTML = ''
-  for (const entry of appState.store.goals) {
-    const item = document.createElement('button')
-    item.className = 'goal-menu-item' + (entry.id === appState.store.currentId ? ' current' : '')
-    item.dataset.id = entry.id
-    item.textContent = entry.goal.title || '（未命名）'
-    menu.appendChild(item)
-  }
-  const sep = document.createElement('div')
-  sep.className = 'goal-menu-sep'
-  menu.appendChild(sep)
-  for (const [id, label] of [['goalMenuNew', '＋ 新建 Goal'], ['goalMenuDelete', '🗑 删除当前 Goal']]) {
-    const action = document.createElement('button')
-    action.id = id
-    action.className = 'goal-menu-action'
-    action.textContent = label
-    menu.appendChild(action)
-  }
+  renderGoalMenu(document.getElementById('goalMenu'))
 
   const fileStatus = document.getElementById('fileStatus')
   fileStatus.hidden = !fileBound()
@@ -210,6 +192,54 @@ export function render() {
 export function autosizeTitleInput(el) {
   el.style.height = 'auto'
   el.style.height = el.scrollHeight + 'px'
+}
+
+// constant icon markup (no user input) for the goal dropdown actions
+const GOAL_ACTIONS = [
+  { id: 'goalMenuNew', danger: false, label: '新建目标',
+    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' },
+  { id: 'goalMenuDelete', danger: true, label: '删除当前目标',
+    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' }
+]
+
+function renderGoalMenu(menu) {
+  menu.innerHTML = ''
+  const label = document.createElement('div')
+  label.className = 'goal-menu-label'
+  label.textContent = '切换目标'
+  menu.appendChild(label)
+
+  for (const entry of appState.store.goals) {
+    const current = entry.id === appState.store.currentId
+    const item = document.createElement('button')
+    item.className = 'goal-menu-item' + (current ? ' current' : '')
+    item.dataset.id = entry.id
+    const title = entry.goal.title || '（未命名）'
+    item.title = title
+    const check = document.createElement('span')
+    check.className = 'goal-menu-check'
+    check.textContent = current ? '✓' : ''
+    const text = document.createElement('span')
+    text.className = 'goal-menu-text'
+    text.textContent = title
+    item.append(check, text)
+    menu.appendChild(item)
+  }
+
+  const sep = document.createElement('div')
+  sep.className = 'goal-menu-sep'
+  menu.appendChild(sep)
+
+  for (const action of GOAL_ACTIONS) {
+    const btn = document.createElement('button')
+    btn.id = action.id
+    btn.className = 'goal-menu-action' + (action.danger ? ' danger' : '')
+    btn.innerHTML = action.icon
+    const text = document.createElement('span')
+    text.textContent = action.label
+    btn.appendChild(text)
+    menu.appendChild(btn)
+  }
 }
 
 function syncMeasuredNodeHeights(layer, visible) {

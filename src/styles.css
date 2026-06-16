@@ -36,43 +36,49 @@ body {
   position: relative; display: flex; align-items: center;
   border: 1px solid var(--border); border-radius: 8px; background: #fff;
 }
+#goalControl.renaming { border-color: var(--doing); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
 #goalName, #goalNameInput {
-  font-size: 15px; font-weight: 700; color: var(--goal);
-  padding: 5px 6px 5px 10px; min-width: 160px; max-width: 320px;
+  font-size: 14px; font-weight: 600; color: var(--goal);
+  padding: 6px 6px 6px 11px;
 }
 #goalName {
-  cursor: text; border-radius: 7px 0 0 7px;
+  cursor: text; border-radius: 7px 0 0 7px; max-width: 200px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #goalName:hover { background: #f0f2f5; }
-#goalNameInput { border: none; outline: none; background: transparent; }
+#goalNameInput { border: none; outline: none; background: transparent; width: 210px; }
 #goalMenuBtn {
-  border: none; background: none; color: var(--muted);
-  font-size: 13px; padding: 7px 10px 7px 6px; border-radius: 0 7px 7px 0; cursor: pointer;
+  display: flex; align-items: center; border: none; background: none;
+  color: var(--muted); padding: 7px 9px; border-radius: 0 7px 7px 0; cursor: pointer;
 }
 #goalMenuBtn:hover { background: #f0f2f5; }
 #goalMenu {
-  position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 30;
-  background: #fff; border: 1px solid var(--border); border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14); padding: 4px; min-width: 220px;
-  display: flex; flex-direction: column; gap: 2px;
+  position: absolute; top: calc(100% + 5px); left: 0; z-index: 30;
+  width: 240px; max-height: 300px; overflow-y: auto;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14); padding: 4px;
 }
+#goalMenu .goal-menu-label { font-size: 11px; color: #b6bcc6; padding: 6px 10px 4px; }
 #goalMenu button {
-  display: block; width: 100%; text-align: left; font-family: inherit;
-  font-size: 13px; padding: 7px 10px; border: none; background: none;
-  border-radius: 6px; cursor: pointer; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  font-family: inherit; font-size: 13px; padding: 7px 10px; border: none;
+  background: none; border-radius: 6px; cursor: pointer; color: var(--text);
 }
-#goalMenu button:hover { background: #f0f2f5; }
-#goalMenu .goal-menu-item.current { font-weight: 700; color: var(--goal); }
-#goalMenu .goal-menu-item.current::after { content: ' ✓'; }
-#goalMenu .goal-menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+#goalMenu button:hover { background: #f5f6f8; }
+#goalMenu .goal-menu-check { flex: 0 0 14px; color: var(--doing); font-weight: 700; }
+#goalMenu .goal-menu-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#goalMenu .goal-menu-item.current { background: #eef2ff; }
+#goalMenu .goal-menu-item.current .goal-menu-text { font-weight: 600; color: var(--goal); }
+#goalMenu .goal-menu-sep { height: 1px; background: var(--border); margin: 5px 6px; }
+#goalMenu .goal-menu-action { color: var(--muted); }
+#goalMenu .goal-menu-action svg { flex: 0 0 auto; }
+#goalMenu .goal-menu-action.danger:hover { background: #fee2e2; color: var(--danger); }
 #toolbar .spacer { flex: 1; }
-#toolbar button, #toolbar label.btn {
+#toolbar > button, #toolbar > label.btn {
   font-size: 13px; padding: 6px 12px; cursor: pointer;
   background: #fff; border: 1px solid var(--border); border-radius: 6px; color: var(--text);
 }
-#toolbar button:hover, #toolbar label.btn:hover { background: #f0f2f5; }
+#toolbar > button:hover, #toolbar > label.btn:hover { background: #f0f2f5; }
 #zoomLabel { font-size: 12px; color: var(--muted); min-width: 42px; text-align: center; }
 #importFile { display: none; }
 

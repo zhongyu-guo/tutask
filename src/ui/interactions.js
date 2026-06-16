@@ -432,6 +432,7 @@ function resetLayout() {
 // ---------- goal title control: inline rename + switch/new/delete menu ----------
 
 function setupGoalControl() {
+  const control = document.getElementById('goalControl')
   const name = document.getElementById('goalName')
   const input = document.getElementById('goalNameInput')
   const menu = document.getElementById('goalMenu')
@@ -442,6 +443,7 @@ function setupGoalControl() {
     input.value = appState.goal.title
     name.hidden = true
     input.hidden = false
+    control.classList.add('renaming')
     input.focus()
     input.select()
   }
@@ -449,6 +451,7 @@ function setupGoalControl() {
     if (input.hidden) return
     input.hidden = true
     name.hidden = false
+    control.classList.remove('renaming')
     const title = input.value.trim() || appState.goal.title
     if (commit && title !== appState.goal.title) {
       setStore(renameCurrentGoal(appState.store, title))
@@ -470,14 +473,16 @@ function setupGoalControl() {
   menu.addEventListener('click', e => {
     const item = e.target.closest('.goal-menu-item')
     if (item) { closeMenu(); setStore(switchGoal(appState.store, item.dataset.id)); return }
-    if (e.target.id === 'goalMenuNew') {
+    const action = e.target.closest('.goal-menu-action')
+    if (!action) return
+    if (action.id === 'goalMenuNew') {
       closeMenu()
       const newName = window.prompt('新 Goal 的名称：', '新目标')
       if (newName === null) return
       setStore(addGoal(appState.store, createGoal(newName.trim() || '新目标')))
       return
     }
-    if (e.target.id === 'goalMenuDelete') {
+    if (action.id === 'goalMenuDelete') {
       closeMenu()
       if (appState.store.goals.length === 1) {
         window.alert('至少保留一个 Goal，无法删除')
