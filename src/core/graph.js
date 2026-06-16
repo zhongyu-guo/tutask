@@ -68,7 +68,9 @@ function computeHidden(goal, collapsedIds) {
 }
 
 export function hiddenByCollapse(goal) {
-  const collapsedIds = new Set(goal.nodes.filter(n => n.collapsed).map(n => n.id))
+  const collapsedIds = new Set(goal.nodes
+    .filter(n => n.collapsed || n.chainStatus === 'paused')
+    .map(n => n.id))
   if (collapsedIds.size === 0) return new Set()
   return computeHidden(goal, collapsedIds)
 }

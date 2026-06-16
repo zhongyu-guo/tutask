@@ -21,7 +21,7 @@ describe('addNode', () => {
     const node = next.nodes[1]
     expect(node.id).toBeTruthy()
     expect(node).toMatchObject({
-      title: 'A', type: 'project', status: 'todo', description: '',
+      title: 'A', type: 'project', status: 'todo', chainStatus: 'active', description: '',
       estimatedHours: null, deadline: null, x: null, y: null,
       collapsed: false, detailOpen: false
     })

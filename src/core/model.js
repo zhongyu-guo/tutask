@@ -15,7 +15,7 @@ export function createGoal(title) {
     edgeDirection: 'child-to-parent',
     nodes: [{
       id: 'root', type: 'goal', title,
-      status: 'todo', description: '', estimatedHours: null, deadline: null,
+      status: 'todo', chainStatus: 'active', description: '', estimatedHours: null, deadline: null,
       x: null, y: null, collapsed: false, detailOpen: false,
       fill: null, stroke: null
     }],
@@ -26,7 +26,7 @@ export function createGoal(title) {
 export function addNode(goal, { title, type }) {
   const node = {
     id: genId(), type, title,
-    status: 'todo', description: '', estimatedHours: null, deadline: null,
+    status: 'todo', chainStatus: 'active', description: '', estimatedHours: null, deadline: null,
     x: null, y: null, collapsed: false, detailOpen: false,
     fill: null, stroke: null
   }

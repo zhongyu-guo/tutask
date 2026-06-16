@@ -41,7 +41,7 @@ test('happy path: edit goal, build chain, cycle status, persist across reload', 
   await expect(page.locator('.node')).toHaveCount(4)
   await expect(page.locator('#edges .edge')).toHaveCount(3)
 
-  // Space cycles status: todo → doing
+  // Space cycles node status: todo → doing
   await expect(page.locator('.node.selected .title')).toHaveText('做海报')
   await page.keyboard.press(' ')
   await expect(page.locator('.node.doing .title')).toHaveText('做海报')
@@ -124,6 +124,101 @@ test('collapse folds the prerequisite sub-step chain with count badge', async ({
   // expand restores them
   await page.locator('.collapse-btn.collapsed').click()
   await expect(page.locator('.node')).toHaveCount(4)
+})
+
+test('pausing a chain greys the node and folds its sub-step descendants', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').click()
+  for (const name of ['A', 'B', 'C']) {
+    await page.keyboard.press('Tab')
+    await page.locator('.title-input').fill(name)
+    await page.keyboard.press('Enter')
+  }
+
+  const edgeToRoot = async () => page.evaluate(() => {
+    const node = [...document.querySelectorAll('.node')]
+      .find(item => item.querySelector('.title')?.textContent === 'A')
+    const hit = [...document.querySelectorAll('#edges .edge-hit')]
+      .find(path => path.dataset.from === node.dataset.id && path.dataset.to === 'root')
+    const edge = hit.previousElementSibling
+    return {
+      marker: edge.getAttribute('marker-end'),
+      chainStatus: edge.dataset.chainStatus,
+      stroke: getComputedStyle(edge).stroke
+    }
+  })
+
+  await expect.poll(async () => (await edgeToRoot()).chainStatus).toBe('active')
+  let edge = await edgeToRoot()
+  expect(edge.marker).toBe('url(#arrow)')
+  expect(edge.stroke).toBe('rgb(59, 130, 246)')
+  await expect(page.locator('.node .title', { hasText: 'A' }).locator('..')).toHaveCSS('border-color', 'rgb(191, 219, 254)')
+  const todoBeforeContent = await page.locator('.node .title', { hasText: 'A' }).locator('..')
+    .evaluate(card => getComputedStyle(card, '::before').content)
+  expect(todoBeforeContent).toBe('none')
+
+  await selectNodeByTitle(page, 'A')
+  await page.locator('.node.selected .card').dblclick()
+  await page.locator('#stylePanel .f-chain-status').selectOption('paused')
+  await expect(page.locator('.node')).toHaveCount(2)
+  await expect(page.locator('.node.chain-paused .title')).toHaveText('A')
+  await expect(page.locator('.node.chain-paused .card')).toHaveCSS('background-color', 'rgb(233, 237, 242)')
+  await expect(page.locator('.node.chain-paused .card')).toHaveCSS('border-color', 'rgb(170, 178, 189)')
+  await expect(page.locator('.node.chain-paused .collapse-btn')).toHaveText('2▸')
+  edge = await edgeToRoot()
+  expect(edge.chainStatus).toBe('paused')
+  expect(edge.marker).toBe('url(#arrow-paused)')
+  expect(edge.stroke).toBe('rgb(138, 145, 156)')
+
+  await page.reload()
+  await expect(page.locator('.node')).toHaveCount(2)
+  await expect(page.locator('.node.chain-paused .title')).toHaveText('A')
+  edge = await edgeToRoot()
+  expect(edge.chainStatus).toBe('paused')
+  expect(edge.marker).toBe('url(#arrow-paused)')
+
+  await page.locator('.node.chain-paused .card').dblclick()
+  await page.locator('#stylePanel .f-chain-status').selectOption('active')
+  await expect(page.locator('.node')).toHaveCount(4)
+  edge = await edgeToRoot()
+  expect(edge.chainStatus).toBe('active')
+  expect(edge.marker).toBe('url(#arrow)')
+})
+
+test('active chain edges render above paused chain edges', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').click()
+  for (const name of ['Paused path', 'Active path']) {
+    await page.keyboard.press('Tab')
+    await page.locator('.title-input').fill(name)
+    await page.keyboard.press('Enter')
+    await page.locator('.node[data-id="root"] .card').click()
+  }
+
+  await selectNodeByTitle(page, 'Paused path')
+  await page.locator('.node.selected .card').dblclick()
+  await page.locator('#stylePanel .f-chain-status').selectOption('paused')
+
+  const order = await page.evaluate(() => {
+    const edgeIndex = edge => [...document.querySelectorAll('#edges .edge')].indexOf(edge)
+    const edgeForTitle = title => {
+      const node = [...document.querySelectorAll('.node')]
+        .find(item => item.querySelector('.title')?.textContent === title)
+      const hit = [...document.querySelectorAll('#edges .edge-hit')]
+        .find(path => path.dataset.from === node.dataset.id && path.dataset.to === 'root')
+      return hit.previousElementSibling
+    }
+    const paused = edgeForTitle('Paused path')
+    const active = edgeForTitle('Active path')
+    return {
+      pausedIndex: edgeIndex(paused),
+      activeIndex: edgeIndex(active),
+      pausedStatus: paused.dataset.chainStatus,
+      activeStatus: active.dataset.chainStatus
+    }
+  })
+
+  expect(order.pausedStatus).toBe('paused')
+  expect(order.activeStatus).toBe('active')
+  expect(order.activeIndex).toBeGreaterThan(order.pausedIndex)
 })
 
 test('undo restores a deleted node and redo deletes it again', async ({ page }) => {
@@ -384,13 +479,61 @@ test('default view centers the visible graph vertically', async ({ page }) => {
   expect(Math.abs(metrics.graphCenterY - metrics.viewportCenterY)).toBeLessThan(2)
 })
 
+test('direction button mirrors the graph order from a stable goal anchor', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').click()
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('Project')
+  await page.keyboard.press('Enter')
+  await selectNodeByTitle(page, 'Project')
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('Task')
+  await page.keyboard.press('Enter')
+
+  const positions = async () => page.evaluate(() => {
+    const nodeByTitle = title => [...document.querySelectorAll('.node')]
+      .find(node => node.querySelector('.title')?.textContent === title)
+    const root = document.querySelector('.node[data-id="root"]')
+    return {
+      root: root.getBoundingClientRect().left,
+      project: nodeByTitle('Project').getBoundingClientRect().left,
+      task: nodeByTitle('Task').getBoundingClientRect().left
+    }
+  })
+
+  const ltr = await positions()
+  expect(ltr.root).toBeLessThan(ltr.project)
+  expect(ltr.project).toBeLessThan(ltr.task)
+  expect(ltr.root).toBeCloseTo(80, 0)
+  await expect(page.locator('#btnDirection')).toHaveAttribute('aria-pressed', 'false')
+
+  await page.locator('#btnDirection').click()
+  const rtl = await positions()
+  expect(rtl.task).toBeLessThan(rtl.project)
+  expect(rtl.project).toBeLessThan(rtl.root)
+  const rtlAnchor = await page.evaluate(() => {
+    const canvas = document.getElementById('canvas')
+    const root = document.querySelector('.node[data-id="root"]')
+    return canvas.clientWidth - 80 - root.getBoundingClientRect().width
+  })
+  expect(rtl.root).toBeCloseTo(rtlAnchor, 0)
+  await expect(page.locator('#btnDirection')).toHaveAttribute('aria-pressed', 'true')
+
+  await page.reload()
+  const persisted = await positions()
+  expect(persisted.task).toBeLessThan(persisted.project)
+  expect(persisted.project).toBeLessThan(persisted.root)
+  expect(persisted.root).toBeCloseTo(rtlAnchor, 0)
+  await expect(page.locator('#btnDirection')).toHaveAttribute('aria-pressed', 'true')
+})
+
 test('info button toggles the keyboard and mouse help', async ({ page }) => {
   await expect(page.locator('#hint')).toBeHidden()
   await expect(page.locator('#btnInfo')).toHaveAttribute('aria-expanded', 'false')
 
   await page.locator('#btnInfo').click()
   await expect(page.locator('#hint')).toBeVisible()
-  await expect(page.locator('#hint')).toContainText('双击节点编辑')
+  await expect(page.locator('#hint')).toContainText('单击节点选中')
+  await expect(page.locator('#hint')).toContainText('Space 切节点状态')
   await expect(page.locator('#btnInfo')).toHaveAttribute('aria-expanded', 'true')
 
   await page.mouse.click(600, 300)
@@ -422,7 +565,7 @@ test('drag preview arrow points from source toward target', async ({ page }) => 
     }
   })
   expect(metrics.marker).toBe('url(#arrow)')
-  expect(metrics.startX).toBeGreaterThan(metrics.rootX)
+  expect(metrics.startX).toBeLessThan(metrics.rootX)
   expect(metrics.endX).toBeGreaterThan(metrics.startX)
 
   await page.mouse.up()
@@ -452,6 +595,9 @@ test('dragging from A to B creates a source-to-target edge', async ({ page }) =>
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
   await page.mouse.down()
   await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2)
+  const targetConnectorOpacity = await page.locator('.node', { hasText: 'B' }).locator('.connector')
+    .evaluate(connector => getComputedStyle(connector).opacity)
+  expect(targetConnectorOpacity).toBe('0')
   await page.mouse.up()
 
   await expect(page.locator('#edges .edge')).toHaveCount(2)

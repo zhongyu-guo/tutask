@@ -16,7 +16,8 @@ const STROKE_SWATCHES = [
   { name: '绿', value: '#34a853' }
 ]
 
-const STATUS_LABEL = { todo: '待开始', doing: '进行中', done: '已完成' }
+const STATUS_LABEL = { todo: '未开始', doing: '正在执行', done: '已完成' }
+const CHAIN_STATUS_LABEL = { active: '链条：进行中', paused: '链条：挂起' }
 
 let panel = null
 let target = null // { kind: 'node', id } | { kind: 'edge', from, to }
@@ -41,6 +42,10 @@ function ensurePanel() {
       <div class="sp-section">
         <textarea class="f-description" placeholder="任务描述…"></textarea>
         <div class="sp-field-row">
+          <select class="f-chain-status">
+            ${['active', 'paused'].map(s =>
+              `<option value="${s}">${CHAIN_STATUS_LABEL[s]}</option>`).join('')}
+          </select>
           <select class="f-status">
             ${['todo', 'doing', 'done'].map(s =>
               `<option value="${s}">${STATUS_LABEL[s]}</option>`).join('')}
@@ -75,6 +80,8 @@ function ensurePanel() {
       setGoal(updateNode(appState.goal, id, { description: e.target.value }))
     } else if (e.target.classList.contains('f-status')) {
       setGoal(updateNode(appState.goal, id, { status: e.target.value }))
+    } else if (e.target.classList.contains('f-chain-status')) {
+      setGoal(updateNode(appState.goal, id, { chainStatus: e.target.value }))
     } else if (e.target.classList.contains('f-hours')) {
       const value = e.target.value === '' ? null : Number(e.target.value)
       setGoal(updateNode(appState.goal, id, { estimatedHours: value }))
@@ -159,6 +166,7 @@ function syncSelection() {
 function syncFields(node) {
   panel.querySelector('.sp-title').value = node.title ?? ''
   panel.querySelector('.f-description').value = node.description ?? ''
+  panel.querySelector('.f-chain-status').value = node.chainStatus ?? 'active'
   panel.querySelector('.f-status').value = node.status
   panel.querySelector('.f-hours').value = node.estimatedHours ?? ''
   panel.querySelector('.f-deadline').value = node.deadline ?? ''

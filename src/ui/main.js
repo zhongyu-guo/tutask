@@ -8,6 +8,16 @@ import {
 import { setupInteractions } from './interactions.js'
 import { centerVisibleNodes, DEFAULT_PAN_X } from './render.js'
 
+const MAIN_LAYOUT_DIRECTION_KEY = 'taskdag-layout-direction'
+
+function loadLayoutDirection() {
+  try {
+    return localStorage.getItem(MAIN_LAYOUT_DIRECTION_KEY) === 'rtl' ? 'rtl' : 'ltr'
+  } catch (error) {
+    return 'ltr'
+  }
+}
+
 async function initFileSync() {
   setFileSyncCallbacks({
     onExternalChange: store => {
@@ -35,6 +45,7 @@ function boot() {
   const store = load() ?? createStore(createGoal('双击编辑目标名称'))
   appState.store = store
   appState.goal = currentGoal(store)
+  appState.layoutDirection = loadLayoutDirection()
   save(store, appState) // persist immediately so legacy-format data is migrated once
   appState.pan = {
     x: DEFAULT_PAN_X,

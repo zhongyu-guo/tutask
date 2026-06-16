@@ -1,4 +1,4 @@
-import { predecessorsOf, isReady, hiddenByCollapse, collapsedCount, nodeType } from '../core/graph.js'
+import { predecessorsOf, hiddenByCollapse, collapsedCount, nodeType } from '../core/graph.js'
 import { autoLayout, resolvePositions } from '../core/layout.js'
 import { appState } from './state.js'
 import { fileBound, boundFileName, fileApiAvailable } from './storage.js'
@@ -48,6 +48,16 @@ function arrowMarker(id, fill) {
       </marker>`
 }
 
+function nodeById(goal) {
+  return new Map(goal.nodes.map(node => [node.id, node]))
+}
+
+function edgeChainStatus(nodes, edge) {
+  const from = nodes.get(edge.from)
+  const to = nodes.get(edge.to)
+  return from?.chainStatus === 'paused' || to?.chainStatus === 'paused' ? 'paused' : 'active'
+}
+
 function nodeHeight(id) {
   return appState.nodeHeights.get(id) ?? NODE_H
 }
@@ -69,11 +79,32 @@ function visibleNodeBounds() {
   return { minX, minY, maxX, maxY }
 }
 
+function applyLayoutDirection(positions) {
+  if (appState.layoutDirection !== 'rtl') return positions
+  const root = positions.get('root')
+  if (!root) return positions
+  const mirrored = new Map()
+  for (const [id, pos] of positions.entries()) {
+    mirrored.set(id, {
+      x: root.x - (pos.x - root.x),
+      y: pos.y
+    })
+  }
+  return mirrored
+}
+
+function initialPanX(canvas) {
+  if (appState.layoutDirection === 'rtl') {
+    return Math.max(16, Math.round(canvas.clientWidth - DEFAULT_PAN_X - NODE_W * appState.zoom))
+  }
+  return DEFAULT_PAN_X
+}
+
 export function centerVisibleNodes({ resetZoom = false } = {}) {
   const canvas = document.getElementById('canvas')
   const bounds = visibleNodeBounds()
   if (resetZoom) appState.zoom = 1
-  appState.pan.x = DEFAULT_PAN_X
+  appState.pan.x = initialPanX(canvas)
   if (!bounds) {
     appState.pan.y = Math.round(canvas.clientHeight / 2)
     updateTransform()
@@ -90,24 +121,43 @@ function renderEdges(svg, goal, positions, visible) {
   const customColors = [...new Set(
     goal.edges.map(e => e.color).filter(c => isHexColor(c)))]
   const markerId = new Map(customColors.map((c, i) => [c, `arrow-c${i}`]))
+  const nodes = nodeById(goal)
   svg.innerHTML = `
     <defs>
-      ${arrowMarker('arrow', 'var(--edge)')}
+      ${arrowMarker('arrow', 'var(--edge-active)')}
+      ${arrowMarker('arrow-paused', 'var(--edge-paused)')}
+      ${arrowMarker('arrow-selected', 'var(--danger)')}
       ${customColors.map(c => arrowMarker(markerId.get(c), c)).join('')}
     </defs>`
+  const rendered = []
   for (const edge of goal.edges) {
     if (!visible.has(edge.from) || !visible.has(edge.to)) continue
     const from = positions.get(edge.from)
     const to = positions.get(edge.to)
     if (!from || !to) continue
-    const d = edgePath(from, to, nodeHeight(edge.from), nodeHeight(edge.to))
+    rendered.push({
+      edge,
+      d: edgePath(from, to, nodeHeight(edge.from), nodeHeight(edge.to)),
+      selected: appState.selectedEdge?.from === edge.from && appState.selectedEdge?.to === edge.to,
+      chainStatus: edgeChainStatus(nodes, edge)
+    })
+  }
+  const priority = item => item.selected ? 2 : item.chainStatus === 'active' ? 1 : 0
+  rendered.sort((a, b) => priority(a) - priority(b))
+
+  for (const item of rendered) {
+    const { edge, d, selected, chainStatus } = item
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     path.setAttribute('d', d)
-    const selected = appState.selectedEdge?.from === edge.from && appState.selectedEdge?.to === edge.to
-    path.setAttribute('class', selected ? 'edge selected' : 'edge')
-    const custom = isHexColor(edge.color) ? edge.color : null
-    path.style.stroke = custom ?? ''
-    path.setAttribute('marker-end', `url(#${custom ? markerId.get(custom) : 'arrow'})`)
+    path.setAttribute('class', `edge ${chainStatus}${selected ? ' selected' : ''}`)
+    path.dataset.chainStatus = chainStatus
+    const custom = chainStatus === 'active' && isHexColor(edge.color) ? edge.color : null
+    if (custom && !selected) path.style.stroke = custom
+    const marker = selected ? 'arrow-selected'
+      : chainStatus === 'paused' ? 'arrow-paused'
+        : custom ? markerId.get(custom)
+          : 'arrow'
+    path.setAttribute('marker-end', `url(#${marker})`)
     const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     hit.setAttribute('d', d)
     hit.setAttribute('class', 'edge-hit')
@@ -120,7 +170,7 @@ function renderEdges(svg, goal, positions, visible) {
 
 function nodeClasses(goal, node) {
   const classes = ['node', nodeType(goal, node), node.status]
-  if (isReady(goal, node.id)) classes.push('ready')
+  if ((node.chainStatus ?? 'active') === 'paused') classes.push('chain-paused')
   if (node.id === appState.selectedId) classes.push('selected')
   if (isOverdue(node)) classes.push('overdue')
   return classes.join(' ')
@@ -147,9 +197,12 @@ function renderBadges(node) {
 function renderCollapseBtn(goal, node) {
   const steps = predecessorsOf(goal, node.id)
   if (steps.length === 0) return ''
-  if (node.collapsed) {
+  const paused = (node.chainStatus ?? 'active') === 'paused'
+  if (node.collapsed || paused) {
     const count = collapsedCount(goal, node.id)
-    return `<button class="collapse-btn collapsed" data-id="${node.id}" title="展开前序步骤">${count}▸</button>`
+    const cls = paused ? 'collapse-btn collapsed paused' : 'collapse-btn collapsed'
+    const title = paused ? '链条挂起，子节点已收起' : '展开前序步骤'
+    return `<button class="${cls}" data-id="${node.id}" title="${title}">${count}▸</button>`
   }
   return `<button class="collapse-btn" data-id="${node.id}" title="收起前序步骤">▾</button>`
 }
@@ -163,7 +216,7 @@ export function render() {
     .map(([id, height]) => [id, height - NODE_H]))
 
   const auto = autoLayout(goal, visible, { gapX: GAP_X, gapY: GAP_Y, detailHeights })
-  const positions = resolvePositions(goal, auto)
+  const positions = applyLayoutDirection(resolvePositions(goal, auto))
   appState.lastPositions = positions
   appState.lastVisible = visible
 
@@ -204,6 +257,11 @@ export function render() {
 
   document.getElementById('storageWarning').hidden = !appState.storageBroken
   document.getElementById('fileReconnectBar').hidden = !appState.fileReconnect
+  const directionBtn = document.getElementById('btnDirection')
+  directionBtn.setAttribute('aria-pressed', appState.layoutDirection === 'rtl' ? 'true' : 'false')
+  directionBtn.title = appState.layoutDirection === 'rtl'
+    ? '切换为 Goal → Project → Task'
+    : '切换为 Task ← Project ← Goal'
 
   updateTransform()
 

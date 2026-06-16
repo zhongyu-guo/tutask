@@ -13,6 +13,7 @@ export const appState = {
   undoFuture: [],
   pan: { x: 80, y: 0 },
   zoom: 1,
+  layoutDirection: 'ltr',
   dragEdgeFrom: null,
   storageBroken: false,
   fileReconnect: null, // async fn when a saved file binding awaits a user gesture

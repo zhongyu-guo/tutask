@@ -1,4 +1,5 @@
 const STATUSES = ['todo', 'doing', 'done']
+const CHAIN_STATUSES = ['active', 'paused']
 const TYPES = ['goal', 'project', 'task']
 
 export function validateGoal(obj) {
@@ -20,6 +21,9 @@ export function validateGoal(obj) {
     if (typeof node.title !== 'string') errors.push(`节点 ${node.id} 缺少 title`)
     if (!TYPES.includes(node.type)) errors.push(`节点 ${node.id} 的 type 非法`)
     if (!STATUSES.includes(node.status)) errors.push(`节点 ${node.id} 的 status 非法`)
+    if (node.chainStatus !== undefined && !CHAIN_STATUSES.includes(node.chainStatus)) {
+      errors.push(`节点 ${node.id} 的 chainStatus 非法`)
+    }
   }
   if (!ids.has('root')) errors.push('缺少 root 根节点')
 

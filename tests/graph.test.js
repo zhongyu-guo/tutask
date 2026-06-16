@@ -117,6 +117,16 @@ describe('hiddenByCollapse', () => {
     expect(hiddenByCollapse(goal).size).toBe(0)
   })
 
+  it('treats a paused chain as collapsed for its sub-step descendants', () => {
+    let { goal, ids } = buildChain()
+    goal = updateNode(goal, ids.A, { chainStatus: 'paused' })
+    const hidden = hiddenByCollapse(goal)
+    expect(hidden.has(ids.B)).toBe(true)
+    expect(hidden.has(ids.C)).toBe(false)
+    expect(hidden.has(ids.D)).toBe(false)
+    expect(hidden.has(ids.A)).toBe(false)
+  })
+
   it('hides shared sub-step when all paths into it are collapsed or hidden', () => {
     let { goal, ids } = buildChain()
     goal = updateNode(goal, ids.A, { collapsed: true })

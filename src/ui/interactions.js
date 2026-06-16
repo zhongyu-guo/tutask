@@ -14,6 +14,7 @@ import { bindFile, unbindFile } from './storage.js'
 import { openNodeStylePanel, openEdgeStylePanel, closeStylePanel } from './style-panel.js'
 
 const STATUS_CYCLE = { todo: 'doing', doing: 'done', done: 'todo' }
+const INTERACTIONS_LAYOUT_DIRECTION_KEY = 'taskdag-layout-direction'
 
 function screenToWorld(clientX, clientY) {
   const rect = document.getElementById('canvas').getBoundingClientRect()
@@ -329,13 +330,17 @@ function startNodeDrag(e, nodeEl) {
 }
 
 function startEdgeDrag(e, fromId) {
+  const canvas = document.getElementById('canvas')
   const svg = document.getElementById('edges')
   const temp = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   temp.id = 'templine'
   temp.setAttribute('marker-end', 'url(#arrow)')
   svg.appendChild(temp)
   const fromPos = appState.lastPositions.get(fromId)
-  const x1 = fromPos.x + NODE_W
+  const sourceEl = document.querySelector(`.node[data-id="${fromId}"]`)
+  sourceEl?.classList.add('drawing-source')
+  canvas.classList.add('drawing-edge')
+  const x1 = fromPos.x - 9
   const y1 = fromPos.y + NODE_H / 2
 
   function onMove(ev) {
@@ -347,6 +352,8 @@ function startEdgeDrag(e, fromId) {
   function onUp(ev) {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+    canvas.classList.remove('drawing-edge')
+    sourceEl?.classList.remove('drawing-source')
     temp.remove()
     const targetEl = ev.target.closest?.('.node')
     if (!targetEl) return
@@ -575,6 +582,19 @@ function setupInfoControl() {
   })
 }
 
+function setupDirectionControl() {
+  document.getElementById('btnDirection').addEventListener('click', () => {
+    appState.layoutDirection = appState.layoutDirection === 'rtl' ? 'ltr' : 'rtl'
+    try {
+      localStorage.setItem(INTERACTIONS_LAYOUT_DIRECTION_KEY, appState.layoutDirection)
+    } catch (error) {
+      // view preference is optional; rendering still updates for this session
+    }
+    rerender()
+    centerVisibleNodes()
+  })
+}
+
 // ---------- wiring ----------
 
 export function setupInteractions() {
@@ -635,6 +655,7 @@ export function setupInteractions() {
     if (collapseBtn) {
       const id = collapseBtn.dataset.id
       const node = appState.goal.nodes.find(n => n.id === id)
+      if ((node.chainStatus ?? 'active') === 'paused') return
       setGoal(updateNode(appState.goal, id, { collapsed: !node.collapsed }))
       return
     }
@@ -681,6 +702,7 @@ export function setupInteractions() {
   })
 
   setupGoalControl()
+  setupDirectionControl()
   setupInfoControl()
   document.getElementById('btnFileReconnect').addEventListener('click', async () => {
     const resume = appState.fileReconnect

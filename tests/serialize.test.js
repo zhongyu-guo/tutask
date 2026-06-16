@@ -23,6 +23,7 @@ describe('validateGoal', () => {
     ['nodes not array', { title: 'x', nodes: 'no', edges: [] }],
     ['missing root', { title: 'x', nodes: [{ id: 'a', title: 'a', type: 'task', status: 'todo' }], edges: [] }],
     ['bad status', { title: 'x', nodes: [{ id: 'root', title: 'x', type: 'goal', status: 'nope' }], edges: [] }],
+    ['bad chain status', { title: 'x', nodes: [{ id: 'root', title: 'x', type: 'goal', status: 'todo', chainStatus: 'sleep' }], edges: [] }],
     ['bad type', { title: 'x', nodes: [{ id: 'root', title: 'x', type: 'wat', status: 'todo' }], edges: [] }],
     ['edge to unknown node', { title: 'x', nodes: [{ id: 'root', title: 'x', type: 'goal', status: 'todo' }], edges: [{ from: 'root', to: 'ghost' }] }],
     ['duplicate edge', {
