@@ -8,6 +8,19 @@ export function successorsOf(goal, id) {
   return goal.nodes.filter(n => ids.includes(n.id))
 }
 
+// A node's effective type follows the graph, not its stored field: the goal
+// root is `goal`, any node linked directly to that root is a `project`, and
+// everything deeper is a `task`. Re-parenting therefore updates the look
+// automatically — a project demoted under another project becomes a task.
+// See docs/plans/2026-06-11-task-dag-design.md.
+export function nodeType(goal, node) {
+  if (node.id === 'root' || node.type === 'goal') return 'goal'
+  const rootId = goal.nodes.find(n => n.type === 'goal')?.id ?? 'root'
+  const linkedToRoot = goal.edges.some(e =>
+    (e.from === node.id && e.to === rootId) || (e.from === rootId && e.to === node.id))
+  return linkedToRoot ? 'project' : 'task'
+}
+
 export function wouldCreateCycle(goal, from, to) {
   if (from === to) return true
   // adding from→to creates a cycle iff `from` is reachable from `to`
