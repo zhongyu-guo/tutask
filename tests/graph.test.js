@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createGoal, addNode, addEdge, updateNode } from '../src/core/model.js'
 import {
   predecessorsOf, successorsOf, wouldCreateCycle, isReady,
-  hiddenByCollapse, collapsedCount
+  hiddenByCollapse, collapsedCount, nodeType
 } from '../src/core/graph.js'
 
 // Build with child -> parent edges: A → root, B → A, C → B and C → X, D → X.
@@ -20,6 +20,33 @@ function buildChain() {
   goal = addEdge(goal, ids.D, ids.X)
   return { goal, ids }
 }
+
+describe('nodeType', () => {
+  it('derives type from the graph, not the stored field', () => {
+    const { goal, ids } = buildChain()
+    const root = goal.nodes.find(n => n.id === 'root')
+    expect(nodeType(goal, root)).toBe('goal')
+    // A links directly to root -> project; B/C/D/X are deeper -> task
+    expect(nodeType(goal, goal.nodes.find(n => n.id === ids.A))).toBe('project')
+    expect(nodeType(goal, goal.nodes.find(n => n.id === ids.B))).toBe('task')
+    expect(nodeType(goal, goal.nodes.find(n => n.id === ids.X))).toBe('task')
+  })
+
+  it('demotes a project to a task when it is re-parented away from root', () => {
+    let goal = createGoal('G')
+    goal = addNode(goal, { title: 'P', type: 'project' })
+    const pId = goal.nodes[goal.nodes.length - 1].id
+    goal = addNode(goal, { title: 'Q', type: 'project' })
+    const qId = goal.nodes[goal.nodes.length - 1].id
+    goal = addEdge(goal, pId, 'root')
+    goal = addEdge(goal, qId, 'root')
+    expect(nodeType(goal, goal.nodes.find(n => n.id === pId))).toBe('project')
+    // re-parent P under Q: drop its root link, link it to Q instead
+    goal = { ...goal, edges: goal.edges.filter(e => !(e.from === pId && e.to === 'root')) }
+    goal = addEdge(goal, pId, qId)
+    expect(nodeType(goal, goal.nodes.find(n => n.id === pId))).toBe('task')
+  })
+})
 
 describe('predecessorsOf / successorsOf', () => {
   it('returns direct neighbors', () => {
