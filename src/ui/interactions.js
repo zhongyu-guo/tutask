@@ -91,11 +91,15 @@ function createFloating(worldPos) {
 }
 
 function deleteSelected() {
-  const selected = appState.selectedId
-  if (!selected || selected === 'root') return
+  const selected = [...appState.selectedIds].filter(id => id !== 'root')
+  if (selected.length === 0 && appState.selectedId && appState.selectedId !== 'root') {
+    selected.push(appState.selectedId)
+  }
+  if (selected.length === 0) return
   appState.selectedId = null
+  appState.selectedIds.clear()
   appState.selectedEdge = null
-  setGoal(removeNode(appState.goal, selected))
+  setGoal(selected.reduce((goal, id) => removeNode(goal, id), appState.goal))
 }
 
 function removeEdgePreservingPositions(goal, from, to) {
@@ -125,6 +129,7 @@ function commitEdit(input) {
   stopEditing()
   if (title === '' && wasNew) {
     appState.selectedId = null
+    appState.selectedIds.clear()
     setGoal(removeNode(appState.goal, id))
     return
   }
@@ -140,6 +145,7 @@ function cancelEdit() {
   stopEditing()
   if (wasNew && id) {
     appState.selectedId = null
+    appState.selectedIds.clear()
     setGoal(removeNode(appState.goal, id))
     return
   }
@@ -234,7 +240,12 @@ function onKeydown(e) {
     case 'ArrowRight': e.preventDefault(); moveSelection('right'); break
     case 'ArrowUp': e.preventDefault(); moveSelection('up'); break
     case 'ArrowDown': e.preventDefault(); moveSelection('down'); break
-    case 'Escape': appState.selectedId = null; appState.selectedEdge = null; rerender(); break
+    case 'Escape':
+      appState.selectedId = null
+      appState.selectedIds.clear()
+      appState.selectedEdge = null
+      rerender()
+      break
   }
 }
 
@@ -261,6 +272,108 @@ function treeSiblings(goal, parentId, visible) {
     .map(e => e.from)
 }
 
+function replacePrimaryParentEdge(goal, childId, oldParentId, newParentId) {
+  const oldEdge = goal.edges.find(e => e.from === childId && e.to === oldParentId)
+  const replacement = { ...(oldEdge ?? {}), from: childId, to: newParentId }
+  let inserted = false
+  const edges = []
+  for (const edge of goal.edges) {
+    if (edge.from === childId && edge.to === oldParentId) {
+      if (!inserted) {
+        edges.push(replacement)
+        inserted = true
+      }
+      continue
+    }
+    if (edge.from === childId && edge.to === newParentId) continue
+    edges.push(edge)
+  }
+  if (!inserted) edges.push(replacement)
+  return { ...goal, edges }
+}
+
+function edgePathBetween(from, to, fromHeight = NODE_H, toHeight = NODE_H) {
+  const targetOnRight = to.x + NODE_W / 2 >= from.x + NODE_W / 2
+  const dir = targetOnRight ? 1 : -1
+  const x1 = targetOnRight ? from.x + NODE_W + 9 : from.x - 9
+  const y1 = from.y + fromHeight / 2
+  const x2 = targetOnRight ? to.x : to.x + NODE_W
+  const y2 = to.y + toHeight / 2
+  const dx = Math.max(40, Math.abs(x2 - x1) / 2)
+  return `M ${x1} ${y1} C ${x1 + dir * dx} ${y1}, ${x2 - dir * dx} ${y2}, ${x2} ${y2}`
+}
+
+function reparentPreviewLine() {
+  const svg = document.getElementById('edges')
+  let line = document.getElementById('reparent-preview-line')
+  if (!line) {
+    line = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    line.id = 'reparent-preview-line'
+    line.setAttribute('marker-end', 'url(#arrow)')
+    svg.appendChild(line)
+  }
+  return line
+}
+
+function clearReparentPreview() {
+  document.getElementById('reparent-preview-line')?.remove()
+  document.querySelectorAll('.node.reparent-target')
+    .forEach(node => node.classList.remove('reparent-target'))
+}
+
+function proposedParentForDrag(id, dragLeft, dragTop, oldParentId) {
+  if (!oldParentId) return null
+  const dragCenter = { x: dragLeft + NODE_W / 2, y: dragTop + NODE_H / 2 }
+  const isRtl = appState.layoutDirection === 'rtl'
+  let best = null
+  for (const targetId of appState.lastVisible) {
+    if (targetId === id || targetId === oldParentId) continue
+    const targetPos = appState.lastPositions.get(targetId)
+    if (!targetPos) continue
+    const targetHeight = appState.nodeHeights.get(targetId) ?? NODE_H
+    const targetCenter = {
+      x: targetPos.x + NODE_W / 2,
+      y: targetPos.y + targetHeight / 2
+    }
+    const signedDx = dragCenter.x - targetCenter.x
+    const childSideDistance = isRtl ? -signedDx : signedDx
+    if (childSideDistance < NODE_W * 0.7 || childSideDistance > 460) continue
+    const dy = Math.abs(dragCenter.y - targetCenter.y)
+    if (dy > Math.max(96, targetHeight / 2 + 64)) continue
+    const next = removeEdgePreservingPositions(appState.goal, id, oldParentId)
+    if (wouldCreateCycle(next, id, targetId)) continue
+    const score = dy + Math.abs(childSideDistance - 300) * 0.35
+    if (!best || score < best.score) best = { id: targetId, score }
+  }
+  return best?.id ?? null
+}
+
+function showReparentPreview(childPos, targetId) {
+  clearReparentPreview()
+  if (!targetId) return
+  const targetPos = appState.lastPositions.get(targetId)
+  if (!targetPos) return
+  const line = reparentPreviewLine()
+  line.setAttribute('d', edgePathBetween(childPos, targetPos, NODE_H, appState.nodeHeights.get(targetId) ?? NODE_H))
+  document.querySelector(`.node[data-id="${targetId}"]`)?.classList.add('reparent-target')
+}
+
+function reparentNodeByDrop(id, oldParentId, newParentId, dropY) {
+  let next = replacePrimaryParentEdge(appState.goal, id, oldParentId, newParentId)
+  const visible = appState.lastVisible
+  const siblings = treeSiblings(next, newParentId, visible)
+  const ordered = siblings
+    .map((siblingId, index) => ({
+      id: siblingId,
+      index,
+      y: siblingId === id ? dropY : appState.lastPositions.get(siblingId)?.y ?? Infinity
+    }))
+    .sort((a, b) => a.y - b.y || a.index - b.index)
+    .map(item => item.id)
+  next = reorderChildEdges(next, newParentId, ordered)
+  setGoal(updateNode(next, id, { x: null, y: null }))
+}
+
 // While dragging a tree node, reorder it among its siblings as its y crosses
 // sibling rows. Returns true when a reorder happened (and the DOM re-rendered).
 function realignDuringDrag(id, dragY) {
@@ -283,15 +396,19 @@ function realignDuringDrag(id, dragY) {
 
 function startNodeDrag(e, nodeEl) {
   const id = nodeEl.dataset.id
+  const additiveSelection = e.metaKey || e.ctrlKey
   const startMouse = screenToWorld(e.clientX, e.clientY)
   const startLeft = parseFloat(nodeEl.style.left)
   const startTop = parseFloat(nodeEl.style.top)
+  const oldParentId = primaryParentOf(appState.goal, id, appState.lastVisible)
   // tree nodes live-realign and snap back into the layout on drop;
   // root and floating (orphan) nodes keep free manual placement
   const isTreeNode = id !== 'root'
-    && primaryParentOf(appState.goal, id, appState.lastVisible) !== null
+    && oldParentId !== null
   let el = nodeEl
   let moved = false
+  let proposedParentId = null
+  clearReparentPreview()
 
   function onMove(ev) {
     const current = screenToWorld(ev.clientX, ev.clientY)
@@ -302,16 +419,25 @@ function startNodeDrag(e, nodeEl) {
     if (isTreeNode && realignDuringDrag(id, startTop + dy)) {
       el = document.querySelector(`.node[data-id="${id}"]`) ?? el
     }
-    el.style.left = startLeft + dx + 'px'
-    el.style.top = startTop + dy + 'px'
+    const dragLeft = startLeft + dx
+    const dragTop = startTop + dy
+    el.style.left = dragLeft + 'px'
+    el.style.top = dragTop + 'px'
+    proposedParentId = isTreeNode
+      ? proposedParentForDrag(id, dragLeft, dragTop, oldParentId)
+      : null
+    showReparentPreview({ x: dragLeft, y: dragTop }, proposedParentId)
   }
   function onUp(ev) {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+    clearReparentPreview()
     if (moved) {
       const current = screenToWorld(ev.clientX, ev.clientY)
       const y = startTop + (current.y - startMouse.y)
-      if (isTreeNode) {
+      if (isTreeNode && proposedParentId) {
+        reparentNodeByDrop(id, oldParentId, proposedParentId, y)
+      } else if (isTreeNode) {
         realignDuringDrag(id, y)
         // drop the manual position so the node snaps into its layout slot
         setGoal(updateNode(appState.goal, id, { x: null, y: null }))
@@ -321,7 +447,7 @@ function startNodeDrag(e, nodeEl) {
         }))
       }
     } else {
-      selectNode(id)
+      selectNode(id, { additive: additiveSelection })
       closeStylePanel()
     }
   }
@@ -671,6 +797,7 @@ export function setupInteractions() {
 
   function selectEdgeHit(hit) {
     appState.selectedId = null
+    appState.selectedIds.clear()
     appState.selectedEdge = { from: hit.dataset.from, to: hit.dataset.to }
     rerender()
   }
@@ -696,6 +823,7 @@ export function setupInteractions() {
     e.preventDefault()
     if (window.confirm('删除这条依赖？')) {
       appState.selectedId = null
+      appState.selectedIds.clear()
       appState.selectedEdge = null
       setGoal(removeEdgePreservingPositions(appState.goal, hit.dataset.from, hit.dataset.to))
     }

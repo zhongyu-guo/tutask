@@ -171,7 +171,7 @@ function renderEdges(svg, goal, positions, visible) {
 function nodeClasses(goal, node) {
   const classes = ['node', nodeType(goal, node), node.status]
   if ((node.chainStatus ?? 'active') === 'paused') classes.push('chain-paused')
-  if (node.id === appState.selectedId) classes.push('selected')
+  if (appState.selectedIds.has(node.id)) classes.push('selected')
   if (isOverdue(node)) classes.push('overdue')
   return classes.join(' ')
 }

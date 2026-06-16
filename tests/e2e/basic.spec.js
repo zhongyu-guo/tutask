@@ -105,6 +105,71 @@ test('multiple goals: create, switch, rename, delete', async ({ page }) => {
   await expect(page.locator('.goal-menu-item')).toHaveCount(1)
 })
 
+test('command-click toggles multiple selected nodes', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').click()
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('A')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await page.locator('.title-input').fill('B')
+  await page.keyboard.press('Enter')
+
+  await expect(page.locator('.node.selected .title')).toHaveText('B')
+
+  await page.locator('.node .title', { hasText: 'A' }).click({ modifiers: ['Meta'] })
+  await expect(page.locator('.node.selected .title')).toHaveText(['A', 'B'])
+
+  await page.locator('.node .title', { hasText: 'B' }).click({ modifiers: ['Meta'] })
+  await expect(page.locator('.node.selected .title')).toHaveText('A')
+
+  await page.locator('.node[data-id="root"] .card').click()
+  await expect(page.locator('.node.selected')).toHaveCount(1)
+  await expect(page.locator('.node.selected')).toHaveAttribute('data-id', 'root')
+})
+
+test('dragging a node onto another node proposes and replaces its parent connection', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').click()
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('A')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await page.locator('.title-input').fill('B')
+  await page.keyboard.press('Enter')
+
+  const before = await page.evaluate(() => {
+    const byTitle = title => [...document.querySelectorAll('.node')]
+      .find(node => node.querySelector('.title')?.textContent === title)
+    return {
+      aId: byTitle('A').dataset.id,
+      bId: byTitle('B').dataset.id,
+      rootId: document.querySelector('.node[data-id="root"]').dataset.id
+    }
+  })
+  await expect(page.locator('#edges .edge')).toHaveCount(2)
+
+  const target = await page.locator('.node .title', { hasText: 'A' }).locator('..').boundingBox()
+  const source = await page.locator('.node .title', { hasText: 'B' }).locator('..').boundingBox()
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(target.x + target.width + 150, target.y + target.height / 2, { steps: 12 })
+  await expect(page.locator('#reparent-preview-line')).toHaveCount(1)
+  await expect(page.locator('#reparent-preview-line')).toHaveAttribute('d', /M /)
+  await expect(page.locator('.node.reparent-target .title')).toHaveText('A')
+  await page.mouse.up()
+
+  const after = await page.evaluate(({ aId, bId, rootId }) => {
+    const store = JSON.parse(localStorage.getItem('taskdag-store'))
+    const goal = store.goals.find(entry => entry.id === store.currentId).goal
+    return {
+      hasOldParent: goal.edges.some(edge => edge.from === bId && edge.to === rootId),
+      hasNewParent: goal.edges.some(edge => edge.from === bId && edge.to === aId),
+      edgeCount: goal.edges.length
+    }
+  }, before)
+  expect(after).toEqual({ hasOldParent: false, hasNewParent: true, edgeCount: 2 })
+  await expect(page.locator('#reparent-preview-line')).toHaveCount(0)
+})
+
 test('collapse folds the prerequisite sub-step chain with count badge', async ({ page }) => {
   // build root → A → B → C (B, C are the sub-steps that realize A)
   await page.locator('.node[data-id="root"] .card').click()

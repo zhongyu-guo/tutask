@@ -6,6 +6,7 @@ export const appState = {
   store: null,
   goal: null,
   selectedId: null,
+  selectedIds: new Set(),
   selectedEdge: null,
   editingId: null,
   editingIsNew: false,
@@ -36,10 +37,32 @@ function pushUndo(goal) {
   appState.undoFuture = []
 }
 
+function pruneSelection(goal) {
+  const validNodeIds = new Set(goal.nodes.map(node => node.id))
+  for (const id of appState.selectedIds) {
+    if (!validNodeIds.has(id)) appState.selectedIds.delete(id)
+  }
+  if (appState.selectedId && !validNodeIds.has(appState.selectedId)) {
+    appState.selectedId = appState.selectedIds.values().next().value ?? null
+  }
+  if (appState.selectedEdge &&
+    !goal.edges.some(edge =>
+      edge.from === appState.selectedEdge.from && edge.to === appState.selectedEdge.to)) {
+    appState.selectedEdge = null
+  }
+}
+
+function clearSelection() {
+  appState.selectedId = null
+  appState.selectedIds.clear()
+  appState.selectedEdge = null
+}
+
 export function setGoal(goal, { history = true } = {}) {
   if (history && appState.goal && !sameGoal(appState.goal, goal)) pushUndo(appState.goal)
   appState.goal = goal
   appState.store = updateCurrentGoal(appState.store, goal)
+  pruneSelection(goal)
   save(appState.store, appState)
   appState.renderFn()
 }
@@ -48,8 +71,7 @@ export function undoGoal() {
   const previous = appState.undoPast.pop()
   if (!previous) return false
   appState.undoFuture.push(appState.goal)
-  appState.selectedId = null
-  appState.selectedEdge = null
+  clearSelection()
   appState.editingId = null
   appState.editingIsNew = false
   setGoal(previous, { history: false })
@@ -60,8 +82,7 @@ export function redoGoal() {
   const next = appState.undoFuture.pop()
   if (!next) return false
   appState.undoPast.push(appState.goal)
-  appState.selectedId = null
-  appState.selectedEdge = null
+  clearSelection()
   appState.editingId = null
   appState.editingIsNew = false
   setGoal(next, { history: false })
@@ -72,8 +93,7 @@ export function redoGoal() {
 export function setStore(store, { persist = true } = {}) {
   appState.store = store
   appState.goal = currentGoal(store)
-  appState.selectedId = null
-  appState.selectedEdge = null
+  clearSelection()
   appState.editingId = null
   appState.editingIsNew = false
   appState.undoPast = []
@@ -102,15 +122,33 @@ export function rerender() {
   appState.renderFn()
 }
 
-export function selectNode(id) {
-  if (appState.selectedId === id) return // keep DOM intact so dblclick can land
+export function selectNode(id, { additive = false } = {}) {
+  if (additive) {
+    if (appState.selectedIds.has(id)) {
+      appState.selectedIds.delete(id)
+      appState.selectedId = appState.selectedId === id
+        ? appState.selectedIds.values().next().value ?? null
+        : appState.selectedId
+    } else {
+      appState.selectedIds.add(id)
+      appState.selectedId = id
+    }
+    appState.selectedEdge = null
+    appState.renderFn()
+    return
+  }
+  if (appState.selectedId === id &&
+    appState.selectedIds.size === 1 &&
+    appState.selectedIds.has(id)) return // keep DOM intact so dblclick can land
   appState.selectedId = id
+  appState.selectedIds = new Set([id])
   appState.selectedEdge = null
   appState.renderFn()
 }
 
 export function startEditing(id, isNew = false) {
   appState.selectedId = id
+  appState.selectedIds = new Set([id])
   appState.selectedEdge = null
   appState.editingId = id
   appState.editingIsNew = isNew
