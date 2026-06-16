@@ -204,6 +204,9 @@ export function openEdgeStylePanel(from, to, x, y) {
 }
 
 export function closeStylePanel() {
-  if (panel) panel.hidden = true
+  if (panel) {
+    if (panel.contains(document.activeElement)) document.activeElement.blur()
+    panel.hidden = true
+  }
   target = null
 }

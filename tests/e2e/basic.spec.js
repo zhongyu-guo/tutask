@@ -737,3 +737,16 @@ test('double-click opens details and renames the node from the panel', async ({ 
   await expect(page.locator('.node[data-id="root"] .title')).toHaveText('改名成功')
   await expect(page.locator('#goalName')).toHaveText('改名成功')
 })
+
+test('keyboard creation still works after closing the detail panel', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').dblclick()
+  await page.locator('#stylePanel .sp-title').focus()
+  await page.evaluate(() => {
+    document.querySelector('#stylePanel').hidden = true
+    document.querySelector('#stylePanel .sp-title').dataset.imeComposing = 'true'
+  })
+  await expect(page.locator('#stylePanel')).toBeHidden()
+
+  await page.keyboard.press('Tab')
+  await expect(page.locator('.title-input')).toBeVisible()
+})

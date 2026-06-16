@@ -25,12 +25,19 @@ function screenToWorld(clientX, clientY) {
 }
 
 function isTextTarget(target) {
+  if (target.closest?.('[hidden]')) return false
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
+function releaseHiddenFocus() {
+  const active = document.activeElement
+  if (active?.closest?.('[hidden]')) active.blur()
+}
+
 function isComposingInput(e) {
-  const composingTarget = e.target?.dataset?.imeComposing === 'true'
-  const ignoreNextEnter = e.key === 'Enter' && e.target?.dataset?.ignoreNextEnter === 'true'
+  const textTarget = isTextTarget(e.target)
+  const composingTarget = textTarget && e.target?.dataset?.imeComposing === 'true'
+  const ignoreNextEnter = textTarget && e.key === 'Enter' && e.target?.dataset?.ignoreNextEnter === 'true'
   if (ignoreNextEnter) delete e.target.dataset.ignoreNextEnter
   return e.isComposing || e.keyCode === 229 || composingTarget || ignoreNextEnter
 }
@@ -39,11 +46,35 @@ function lastNodeId(goal) {
   return goal.nodes[goal.nodes.length - 1].id
 }
 
+function activeSelectedNodeId() {
+  const visibleSelected = [...document.querySelectorAll('.node.selected')]
+    .map(node => node.dataset.id)
+    .filter(id => appState.lastVisible.has(id))
+  if (appState.selectedId &&
+    appState.lastVisible.has(appState.selectedId) &&
+    appState.selectedIds.has(appState.selectedId)) {
+    return appState.selectedId
+  }
+  if (visibleSelected.length === 1) {
+    appState.selectedId = visibleSelected[0]
+    appState.selectedIds = new Set([visibleSelected[0]])
+    return visibleSelected[0]
+  }
+  if (appState.selectedIds.size === 1) {
+    const id = appState.selectedIds.values().next().value
+    if (appState.lastVisible.has(id)) {
+      appState.selectedId = id
+      return id
+    }
+  }
+  return null
+}
+
 // ---------- node creation ----------
 
 function createSuccessor() {
   const goal = appState.goal
-  const selected = appState.selectedId
+  const selected = activeSelectedNodeId()
   if (!selected) return
   const parent = goal.nodes.find(n => n.id === selected)
   const type = parent.type === 'goal' ? 'project' : 'task'
@@ -57,7 +88,7 @@ function createSuccessor() {
 
 function createParallel() {
   const goal = appState.goal
-  const selected = appState.selectedId
+  const selected = activeSelectedNodeId()
   if (!selected || selected === 'root') return
   const current = goal.nodes.find(n => n.id === selected)
   const parents = successorsOf(goal, selected)
@@ -187,6 +218,7 @@ function moveSelection(direction) {
 }
 
 function onKeydown(e) {
+  releaseHiddenFocus()
   if (isComposingInput(e)) return
   const commandKey = e.metaKey || e.ctrlKey
   if (commandKey && e.key.toLowerCase() === 'z' && !isTextTarget(e.target)) {
