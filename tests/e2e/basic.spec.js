@@ -370,10 +370,18 @@ test('double-click renames a tall multi-line node without the edit closing itsel
   }
 
   await page.locator('.node[data-id="root"] .card').dblclick()
-  await expect(page.locator('.title-input')).toBeVisible()
+  const editor = page.locator('.title-input')
+  await expect(editor).toBeVisible()
   await page.waitForTimeout(200) // outlast the async height-measurement re-render
-  await expect(page.locator('.title-input')).toBeVisible()
-  await page.locator('.title-input').fill('改名成功')
+  await expect(editor).toBeVisible()
+
+  // the editor is a multi-line textarea grown to show the whole wrapped title,
+  // not a cramped single-line box
+  await expect(editor).toHaveJSProperty('tagName', 'TEXTAREA')
+  const lineHeight = 13.5 * 1.35
+  expect(await editor.evaluate(el => el.scrollHeight)).toBeGreaterThan(lineHeight * 2)
+
+  await editor.fill('改名成功')
   await page.keyboard.press('Enter')
   await expect(page.locator('.node[data-id="root"] .title')).toHaveText('改名成功')
 })

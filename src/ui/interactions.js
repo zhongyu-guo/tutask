@@ -8,7 +8,7 @@ import {
   appState, setGoal, setStore, selectNode, startEditing, stopEditing, rerender,
   undoGoal, redoGoal, storeWithCurrentLayoutOrder
 } from './state.js'
-import { render, ensureVisible, updateTransform, NODE_W, NODE_H } from './render.js'
+import { render, ensureVisible, updateTransform, autosizeTitleInput, NODE_W, NODE_H } from './render.js'
 import { reorderChildEdges, reorderEdgesByPlacement } from '../core/layout.js'
 import { bindFile, unbindFile } from './storage.js'
 import { openNodeStylePanel, openEdgeStylePanel, closeStylePanel } from './style-panel.js'
@@ -485,6 +485,10 @@ export function setupInteractions() {
 
   nodes.addEventListener('focusout', e => {
     if (e.target.classList.contains('title-input')) commitEdit(e.target)
+  })
+
+  nodes.addEventListener('input', e => {
+    if (e.target.classList.contains('title-input')) autosizeTitleInput(e.target)
   })
 
   function selectEdgeHit(hit) {
