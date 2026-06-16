@@ -25,44 +25,51 @@ body {
 
 /* ---------- toolbar ---------- */
 #toolbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  position: fixed; top: 14px; left: 14px; z-index: 20;
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(6px);
+  max-width: calc(100vw - 28px);
 }
 #goalControl {
   position: relative; display: flex; align-items: center;
-  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  max-width: 100%;
+  border: 1px solid rgba(196, 204, 216, 0.86);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(10px);
 }
 #goalControl.renaming { border-color: var(--doing); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
 #goalName, #goalNameInput {
-  font-size: 14px; font-weight: 600; color: var(--goal);
-  padding: 6px 6px 6px 11px;
+  font-size: 14px; font-weight: 700; color: var(--goal);
+  padding: 10px 8px 10px 14px;
 }
 #goalName {
-  cursor: text; border-radius: 7px 0 0 7px; max-width: 200px;
+  cursor: text; border-radius: 11px 0 0 11px; max-width: min(260px, calc(100vw - 88px));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-#goalName:hover { background: #f0f2f5; }
+#goalName:hover { background: rgba(240, 242, 245, 0.82); }
 #goalNameInput { border: none; outline: none; background: transparent; width: 210px; }
 #goalMenuBtn {
   display: flex; align-items: center; border: none; background: none;
-  color: var(--muted); padding: 7px 9px; border-radius: 0 7px 7px 0; cursor: pointer;
+  color: var(--muted); padding: 12px 12px; border-radius: 0 11px 11px 0; cursor: pointer;
+  min-width: 44px; min-height: 44px; justify-content: center;
 }
-#goalMenuBtn:hover { background: #f0f2f5; }
+#goalMenuBtn:hover { background: rgba(240, 242, 245, 0.82); }
 #goalMenu {
-  position: absolute; top: calc(100% + 5px); left: 0; z-index: 30;
-  width: 240px; max-height: 300px; overflow-y: auto;
-  background: #fff; border: 1px solid var(--border); border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14); padding: 4px;
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 30;
+  width: min(300px, calc(100vw - 28px)); max-height: min(560px, calc(100vh - 94px)); overflow-y: auto;
+  background: rgba(255, 255, 255, 0.96); border: 1px solid rgba(196, 204, 216, 0.9); border-radius: 12px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18); padding: 6px;
+  backdrop-filter: blur(12px);
 }
-#goalMenu .goal-menu-label { font-size: 11px; color: #b6bcc6; padding: 6px 10px 4px; }
+#goalMenu .goal-menu-label {
+  font-size: 11px; color: #8a919c; padding: 8px 10px 5px;
+  font-weight: 700; letter-spacing: 0;
+}
 #goalMenu button {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-  font-family: inherit; font-size: 13px; padding: 7px 10px; border: none;
-  background: none; border-radius: 6px; cursor: pointer; color: var(--text);
+  font-family: inherit; font-size: 13px; min-height: 38px; padding: 8px 10px; border: none;
+  background: none; border-radius: 8px; cursor: pointer; color: var(--text);
 }
 #goalMenu button:hover { background: #f5f6f8; }
 #goalMenu .goal-menu-check { flex: 0 0 14px; color: var(--doing); font-weight: 700; }
@@ -73,17 +80,60 @@ body {
 #goalMenu .goal-menu-action { color: var(--muted); }
 #goalMenu .goal-menu-action svg { flex: 0 0 auto; }
 #goalMenu .goal-menu-action.danger:hover { background: #fee2e2; color: var(--danger); }
-#toolbar .spacer { flex: 1; }
-#toolbar > button, #toolbar > label.btn {
-  font-size: 13px; padding: 6px 12px; cursor: pointer;
-  background: #fff; border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+#goalMenu .goal-menu-action.primary { color: var(--text); }
+#goalMenu .goal-menu-action.file-bound { color: #166534; }
+#goalMenu .goal-menu-action.file-bound:hover { background: #fee2e2; color: #991b1b; }
+#goalMenu .goal-menu-action[disabled] {
+  cursor: not-allowed; opacity: 0.48;
 }
-#toolbar > button:hover, #toolbar > label.btn:hover { background: #f0f2f5; }
-#zoomLabel { font-size: 12px; color: var(--muted); min-width: 42px; text-align: center; }
 #importFile { display: none; }
+#cornerControls {
+  position: fixed; right: 18px; bottom: 18px; z-index: 20;
+  display: flex; align-items: flex-end; gap: 10px;
+}
+#infoControl { position: relative; }
+#btnInfo {
+  width: 44px; height: 44px; padding: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(196, 204, 216, 0.88);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(10px);
+}
+#btnInfo:hover,
+#btnInfo[aria-expanded="true"] {
+  color: var(--text);
+  background: #fff;
+}
+#btnInfo:focus-visible,
+#btnZoomReset:focus-visible,
+#goalMenuBtn:focus-visible {
+  outline: 2px solid var(--doing);
+  outline-offset: 2px;
+}
+#zoomControls {
+  display: flex; align-items: center; gap: 8px;
+  height: 44px; padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(196, 204, 216, 0.88);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(10px);
+}
+#zoomLabel {
+  font-size: 13px; color: var(--muted); min-width: 48px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+#btnZoomReset {
+  font-family: inherit; font-size: 13px; height: 36px; padding: 6px 12px; cursor: pointer;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+}
+#btnZoomReset:hover { background: #f0f2f5; }
 
 .warning-bar {
-  position: fixed; top: 49px; left: 0; right: 0; z-index: 19;
+  position: fixed; top: 66px; left: 0; right: 0; z-index: 19;
   padding: 6px 14px; font-size: 13px; text-align: center;
 }
 #storageWarning { background: #fef3c7; color: #92400e; }
@@ -101,7 +151,7 @@ body {
 
 /* ---------- canvas ---------- */
 #canvas {
-  position: absolute; inset: 0; top: 49px;
+  position: absolute; inset: 0;
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--dot) 1.5px, transparent 1.5px);
   background-size: 24px 24px;
@@ -165,7 +215,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity 0.12s;
 }
-.node:hover .collapse-btn { opacity: 1; }
+.node:hover .collapse-btn, .node.selected .collapse-btn { opacity: 1; }
 .collapse-btn:hover { color: var(--text); border-color: var(--muted); }
 /* a collapsed badge carries information (hidden-node count), keep it visible */
 .collapse-btn.collapsed { color: var(--doing); border-color: var(--doing); font-weight: 700; opacity: 1; }
@@ -176,7 +226,7 @@ body {
   background: #fff; border: 2px solid var(--edge); cursor: crosshair; z-index: 2;
   opacity: 0; transition: opacity 0.12s;
 }
-.node:hover .connector { opacity: 1; }
+.node:hover .connector, .node.selected .connector { opacity: 1; }
 .connector:hover { border-color: var(--doing); background: #dbeafe; }
 
 @keyframes flashRed {
@@ -193,9 +243,11 @@ body {
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.16);
 }
 #stylePanel .sp-title {
-  font-weight: 700; margin-bottom: 8px; color: var(--text);
-  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  width: 100%; font-weight: 700; margin-bottom: 8px; color: var(--text);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 8px; font-family: inherit; font-size: 13px;
 }
+#stylePanel .sp-title:focus { border-color: var(--doing); outline: 2px solid rgba(59, 130, 246, 0.18); }
 #stylePanel [hidden] { display: none !important; }
 #stylePanel .sp-section { margin-bottom: 8px; }
 #stylePanel textarea.f-description {
@@ -230,6 +282,20 @@ body {
 
 /* ---------- help hint ---------- */
 #hint {
-  position: fixed; bottom: 10px; left: 14px; z-index: 20;
-  font-size: 12px; color: var(--muted); pointer-events: none;
+  position: fixed; right: 18px; bottom: 82px; z-index: 21;
+  width: min(520px, calc(100vw - 36px));
+  padding: 11px 13px;
+  font-size: 12px; line-height: 1.65; color: var(--text);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(196, 204, 216, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 520px) {
+  #toolbar { top: 10px; left: 10px; max-width: calc(100vw - 20px); }
+  #goalMenu { width: calc(100vw - 20px); max-height: min(560px, calc(100vh - 88px)); }
+  #cornerControls { right: 10px; bottom: 10px; gap: 8px; }
+  #hint { right: 10px; bottom: 74px; width: calc(100vw - 20px); }
 }

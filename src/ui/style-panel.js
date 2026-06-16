@@ -20,6 +20,8 @@ const STATUS_LABEL = { todo: '待开始', doing: '进行中', done: '已完成' 
 
 let panel = null
 let target = null // { kind: 'node', id } | { kind: 'edge', from, to }
+let titleComposing = false
+let ignoreNextTitleEnter = false
 
 function swatchButtons(group, swatches) {
   return swatches.map(s =>
@@ -34,7 +36,7 @@ function ensurePanel() {
   panel.id = 'stylePanel'
   panel.hidden = true
   panel.innerHTML = `
-    <div class="sp-title"></div>
+    <input class="sp-title" aria-label="节点名称" placeholder="节点名称">
     <div class="sp-detail">
       <div class="sp-section">
         <textarea class="f-description" placeholder="任务描述…"></textarea>
@@ -54,7 +56,6 @@ function ensurePanel() {
     </div>
     <div class="sp-actions">
       <button class="sp-reset">重置颜色</button>
-      <button class="sp-close">关闭</button>
     </div>`
   document.body.appendChild(panel)
 
@@ -68,7 +69,9 @@ function ensurePanel() {
   panel.addEventListener('change', e => {
     if (!targetExists() || target.kind !== 'node') return
     const id = target.id
-    if (e.target.classList.contains('f-description')) {
+    if (e.target.classList.contains('sp-title')) {
+      updateNodeTitle(id, e.target.value)
+    } else if (e.target.classList.contains('f-description')) {
       setGoal(updateNode(appState.goal, id, { description: e.target.value }))
     } else if (e.target.classList.contains('f-status')) {
       setGoal(updateNode(appState.goal, id, { status: e.target.value }))
@@ -80,12 +83,41 @@ function ensurePanel() {
     }
   })
 
+  panel.addEventListener('input', e => {
+    if (!targetExists() || target.kind !== 'node') return
+    if (e.target.classList.contains('sp-title') && !titleComposing) {
+      updateNodeTitle(target.id, e.target.value)
+    }
+  })
+
+  panel.addEventListener('compositionstart', e => {
+    if (e.target.classList.contains('sp-title')) titleComposing = true
+  })
+
+  panel.addEventListener('compositionend', e => {
+    if (!e.target.classList.contains('sp-title')) return
+    titleComposing = false
+    ignoreNextTitleEnter = true
+    setTimeout(() => { ignoreNextTitleEnter = false }, 250)
+    if (targetExists() && target.kind === 'node') updateNodeTitle(target.id, e.target.value)
+  })
+
+  panel.addEventListener('keydown', e => {
+    if (e.target.classList.contains('sp-title') && e.key === 'Enter') {
+      if (titleComposing || ignoreNextTitleEnter || e.isComposing || e.keyCode === 229) {
+        ignoreNextTitleEnter = false
+        return
+      }
+      e.preventDefault()
+      e.target.blur()
+    }
+  })
+
   panel.querySelector('.sp-reset').addEventListener('click', () => {
     if (!targetExists() || target.kind !== 'edge') return
     setGoal(updateEdge(appState.goal, target.from, target.to, { color: null }))
     syncSelection()
   })
-  panel.querySelector('.sp-close').addEventListener('click', closeStylePanel)
 
   document.addEventListener('mousedown', e => {
     if (!panel.hidden && !panel.contains(e.target)) closeStylePanel()
@@ -94,6 +126,13 @@ function ensurePanel() {
     if (e.key === 'Escape' && !panel.hidden) closeStylePanel()
   })
   return panel
+}
+
+function updateNodeTitle(id, value) {
+  const title = value.trim()
+  let next = updateNode(appState.goal, id, { title })
+  if (id === 'root') next = { ...next, title }
+  setGoal(next)
 }
 
 // the target may vanish while the panel is open (node/edge deleted elsewhere)
@@ -118,6 +157,7 @@ function syncSelection() {
 }
 
 function syncFields(node) {
+  panel.querySelector('.sp-title').value = node.title ?? ''
   panel.querySelector('.f-description').value = node.description ?? ''
   panel.querySelector('.f-status').value = node.status
   panel.querySelector('.f-hours').value = node.estimatedHours ?? ''
@@ -126,10 +166,13 @@ function syncFields(node) {
 
 function show(x, y, title, { isNode }) {
   const p = ensurePanel()
-  p.querySelector('.sp-title').textContent = title
+  const titleInput = p.querySelector('.sp-title')
+  titleInput.hidden = !isNode
+  titleInput.value = title
   p.querySelector('.sp-detail').hidden = !isNode
   p.querySelector('.sp-stroke').hidden = isNode
   p.querySelector('.sp-reset').hidden = isNode
+  p.querySelector('.sp-actions').hidden = isNode
   p.hidden = false
   const margin = 8
   const w = p.offsetWidth

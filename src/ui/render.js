@@ -5,6 +5,7 @@ import { fileBound, boundFileName, fileApiAvailable } from './storage.js'
 
 export const NODE_W = 210
 export const NODE_H = 64
+export const DEFAULT_PAN_X = 80
 const GAP_X = 300
 const GAP_Y = 104
 
@@ -49,6 +50,38 @@ function arrowMarker(id, fill) {
 
 function nodeHeight(id) {
   return appState.nodeHeights.get(id) ?? NODE_H
+}
+
+function visibleNodeBounds() {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const id of appState.lastVisible) {
+    const pos = appState.lastPositions.get(id)
+    if (!pos) continue
+    minX = Math.min(minX, pos.x)
+    minY = Math.min(minY, pos.y)
+    maxX = Math.max(maxX, pos.x + NODE_W)
+    maxY = Math.max(maxY, pos.y + nodeHeight(id))
+  }
+  if (!Number.isFinite(minX)) return null
+  return { minX, minY, maxX, maxY }
+}
+
+export function centerVisibleNodes({ resetZoom = false } = {}) {
+  const canvas = document.getElementById('canvas')
+  const bounds = visibleNodeBounds()
+  if (resetZoom) appState.zoom = 1
+  appState.pan.x = DEFAULT_PAN_X
+  if (!bounds) {
+    appState.pan.y = Math.round(canvas.clientHeight / 2)
+    updateTransform()
+    return
+  }
+  const boundsCenterY = (bounds.minY + bounds.maxY) / 2
+  appState.pan.y = Math.round(canvas.clientHeight / 2 - boundsCenterY * appState.zoom)
+  updateTransform()
 }
 
 function renderEdges(svg, goal, positions, visible) {
@@ -169,11 +202,6 @@ export function render() {
 
   renderGoalMenu(document.getElementById('goalMenu'))
 
-  const fileStatus = document.getElementById('fileStatus')
-  fileStatus.hidden = !fileBound()
-  fileStatus.textContent = '📁 ' + boundFileName()
-  document.getElementById('btnBindFile').hidden = fileBound() || !fileApiAvailable()
-
   document.getElementById('storageWarning').hidden = !appState.storageBroken
   document.getElementById('fileReconnectBar').hidden = !appState.fileReconnect
 
@@ -200,6 +228,15 @@ const GOAL_ACTIONS = [
     icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' },
   { id: 'goalMenuDelete', danger: true, label: '删除当前目标',
     icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' }
+]
+
+const PROJECT_ACTIONS = [
+  { id: 'btnLayout', label: '整理布局', primary: true,
+    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17h7M17.5 14v7"/></svg>' },
+  { id: 'btnExport', label: '导出 JSON', primary: true,
+    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>' },
+  { id: 'btnImportJson', label: '导入 JSON', primary: true,
+    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>' }
 ]
 
 function renderGoalMenu(menu) {
@@ -230,10 +267,58 @@ function renderGoalMenu(menu) {
   sep.className = 'goal-menu-sep'
   menu.appendChild(sep)
 
+  const goalActionsLabel = document.createElement('div')
+  goalActionsLabel.className = 'goal-menu-label'
+  goalActionsLabel.textContent = '目标'
+  menu.appendChild(goalActionsLabel)
+
   for (const action of GOAL_ACTIONS) {
     const btn = document.createElement('button')
     btn.id = action.id
     btn.className = 'goal-menu-action' + (action.danger ? ' danger' : '')
+    btn.innerHTML = action.icon
+    const text = document.createElement('span')
+    text.textContent = action.label
+    btn.appendChild(text)
+    menu.appendChild(btn)
+  }
+
+  const toolsSep = document.createElement('div')
+  toolsSep.className = 'goal-menu-sep'
+  menu.appendChild(toolsSep)
+
+  const toolsLabel = document.createElement('div')
+  toolsLabel.className = 'goal-menu-label'
+  toolsLabel.textContent = '项目工具'
+  menu.appendChild(toolsLabel)
+
+  if (fileBound()) {
+    const btn = document.createElement('button')
+    btn.id = 'fileStatus'
+    btn.className = 'goal-menu-action file-bound'
+    btn.title = '点击解除绑定'
+    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'
+    const text = document.createElement('span')
+    text.className = 'goal-menu-text'
+    text.textContent = '已绑定：' + boundFileName()
+    btn.appendChild(text)
+    menu.appendChild(btn)
+  } else if (fileApiAvailable()) {
+    const btn = document.createElement('button')
+    btn.id = 'btnBindFile'
+    btn.className = 'goal-menu-action primary'
+    btn.title = '绑定 goals 数据目录（每个 Goal 一个 JSON 文件），localhost 与本地双击打开共用同一份数据'
+    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2"/><path d="M12 17h9"/><path d="M16.5 12.5L21 17l-4.5 4.5"/></svg>'
+    const text = document.createElement('span')
+    text.textContent = '绑定数据目录'
+    btn.appendChild(text)
+    menu.appendChild(btn)
+  }
+
+  for (const action of PROJECT_ACTIONS) {
+    const btn = document.createElement('button')
+    btn.id = action.id
+    btn.className = 'goal-menu-action' + (action.primary ? ' primary' : '')
     btn.innerHTML = action.icon
     const text = document.createElement('span')
     text.textContent = action.label

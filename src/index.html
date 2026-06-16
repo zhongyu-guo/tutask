@@ -16,16 +16,24 @@
     <button id="goalMenuBtn" title="切换 / 新建 / 删除 Goal" aria-label="Goal 菜单"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
     <div id="goalMenu" hidden></div>
   </div>
-  <div class="spacer"></div>
-  <span id="fileStatus" title="点击解除绑定" hidden></span>
-  <button id="btnBindFile" title="绑定 goals 数据目录（每个 Goal 一个 JSON 文件），localhost 与本地双击打开共用同一份数据">绑定数据目录</button>
-  <button id="btnLayout" title="清除手动位置，重新自动排列">整理布局</button>
-  <button id="btnExport">导出 JSON</button>
-  <label class="btn" for="importFile">导入 JSON</label>
-  <input type="file" id="importFile" accept=".json,application/json">
-  <span id="zoomLabel">100%</span>
-  <button id="btnZoomReset" title="重置缩放与平移">重置视图</button>
 </div>
+<div id="cornerControls">
+  <div id="infoControl">
+    <button id="btnInfo" title="操作说明" aria-label="操作说明" aria-expanded="false" aria-controls="hint">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 16v-4"></path>
+        <path d="M12 8h.01"></path>
+      </svg>
+    </button>
+    <div id="hint" role="dialog" aria-label="操作说明" hidden>双击节点编辑 · 单击节点/连线改颜色 · Ctrl/⌘+Z 撤销 · Tab 后继任务 · Enter 并行任务 · Space 切状态 · D 详情 · 拖动⚪连线 · 右键连线删除 · 双击空白新建</div>
+  </div>
+  <div id="zoomControls" aria-label="视图缩放">
+    <span id="zoomLabel">100%</span>
+    <button id="btnZoomReset" title="重置缩放与平移">重置视图</button>
+  </div>
+</div>
+<input type="file" id="importFile" accept=".json,application/json">
 <div id="storageWarning" class="warning-bar" hidden>
   ⚠️ 本地存储不可用，更改不会自动保存——请及时手动导出 JSON
 </div>
@@ -38,7 +46,6 @@
     <div id="nodes"></div>
   </div>
 </div>
-<div id="hint">双击节点编辑 · 单击节点/连线改颜色 · Ctrl/⌘+Z 撤销 · Tab 后继任务 · Enter 并行任务 · Space 切状态 · D 详情 · 拖动⚪连线 · 右键连线删除 · 双击空白新建</div>
 <!-- BUILD:SCRIPT -->
 <script type="module" src="ui/main.js"></script>
 <!-- /BUILD:SCRIPT -->

@@ -6,6 +6,7 @@ import {
   load, save, restoreFileBinding, watchExternalChanges, setFileSyncCallbacks
 } from './storage.js'
 import { setupInteractions } from './interactions.js'
+import { centerVisibleNodes, DEFAULT_PAN_X } from './render.js'
 
 async function initFileSync() {
   setFileSyncCallbacks({
@@ -36,11 +37,12 @@ function boot() {
   appState.goal = currentGoal(store)
   save(store, appState) // persist immediately so legacy-format data is migrated once
   appState.pan = {
-    x: 80,
-    y: Math.round(document.getElementById('canvas').clientHeight / 2)
+    x: DEFAULT_PAN_X,
+    y: 0
   }
   setupInteractions()
   render()
+  centerVisibleNodes()
   initFileSync()
 }
 

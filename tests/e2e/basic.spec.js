@@ -11,14 +11,17 @@ async function selectNodeByTitle(page, title) {
 }
 
 test('happy path: edit goal, build chain, cycle status, persist across reload', async ({ page }) => {
-  // edit goal title via double-click
+  // edit goal title in the detail panel opened by double-click
   await page.locator('.node[data-id="root"] .card').dblclick()
-  await page.locator('.title-input').fill('一周年活动')
-  await page.keyboard.press('Enter')
+  await page.locator('#stylePanel .sp-title').fill('一周年活动')
+  await page.locator('#stylePanel .sp-title').press('Enter')
   await expect(page.locator('.node.goal .title')).toHaveText('一周年活动')
+  await expect(page.locator('.title-input')).toHaveCount(0)
 
   // Tab on root creates a project
   await selectNodeByTitle(page, '一周年活动')
+  await expect(page.locator('#stylePanel')).toBeHidden()
+  await expect(page.locator('.node.selected .connector')).toHaveCSS('opacity', '1')
   await page.keyboard.press('Tab')
   await page.locator('.title-input').fill('前期筹备')
   await page.keyboard.press('Enter')
@@ -47,8 +50,9 @@ test('happy path: edit goal, build chain, cycle status, persist across reload', 
   await selectNodeByTitle(page, '前期筹备')
   await page.keyboard.press('d')
   await expect(page.locator('#stylePanel')).toBeVisible()
-  await expect(page.locator('#stylePanel .sp-title')).toHaveText('前期筹备')
+  await expect(page.locator('#stylePanel .sp-title')).toHaveValue('前期筹备')
   await expect(page.locator('#stylePanel .f-status')).toHaveValue('todo')
+  await expect(page.locator('#stylePanel .sp-close')).toHaveCount(0)
 
   // reload: everything persisted
   await page.reload()
@@ -58,6 +62,7 @@ test('happy path: edit goal, build chain, cycle status, persist across reload', 
 
   // export triggers a download
   const downloadPromise = page.waitForEvent('download')
+  await page.locator('#goalMenuBtn').click()
   await page.locator('#btnExport').click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toContain('taskdag-')
@@ -136,6 +141,79 @@ test('undo restores a deleted node and redo deletes it again', async ({ page }) 
 
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+Z' : 'Control+Shift+Z')
   await expect(page.locator('.node .title', { hasText: '可恢复任务' })).toHaveCount(0)
+})
+
+test('composing Enter from an IME does not create a parallel node', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').click()
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('输入法测试')
+  await page.keyboard.press('Enter')
+  await selectNodeByTitle(page, '输入法测试')
+  await expect(page.locator('.node')).toHaveCount(2)
+
+  await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    Object.defineProperty(event, 'isComposing', { value: true })
+    document.dispatchEvent(event)
+  })
+
+  await expect(page.locator('.node')).toHaveCount(2)
+  await expect(page.locator('.title-input')).toHaveCount(0)
+})
+
+test('IME composition in the detail title writes the committed text only once', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').dblclick()
+  await page.locator('#stylePanel .sp-title').focus()
+
+  const valueDuringComposition = await page.evaluate(() => {
+    const input = document.querySelector('#stylePanel .sp-title')
+    input.value = '构建flowtasks'
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    input.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'flowtasks' }))
+    const titleBeforeCommit = document.querySelector('.node[data-id="root"] .title').textContent
+    input.value = '构建flowtasks'
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: 'flowtasks' }))
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    return {
+      inputValue: input.value,
+      titleBeforeCommit,
+      titleAfterCommit: document.querySelector('.node[data-id="root"] .title').textContent,
+      panelHidden: document.querySelector('#stylePanel').hidden
+    }
+  })
+
+  expect(valueDuringComposition).toEqual({
+    inputValue: '构建flowtasks',
+    titleBeforeCommit: '双击编辑目标名称',
+    titleAfterCommit: '构建flowtasks',
+    panelHidden: false
+  })
+})
+
+test('Enter inserts a parallel node directly below the selected sibling', async ({ page }) => {
+  await page.locator('.node[data-id="root"] .card').click()
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('A')
+  await page.keyboard.press('Enter')
+  for (const name of ['B', 'C']) {
+    await page.keyboard.press('Enter')
+    await page.locator('.title-input').fill(name)
+    await page.keyboard.press('Enter')
+  }
+
+  await selectNodeByTitle(page, 'A')
+  await page.keyboard.press('Enter')
+  await page.locator('.title-input').fill('A 后面')
+  await page.keyboard.press('Enter')
+
+  const order = await page.evaluate(() => [...document.querySelectorAll('.node.project')]
+    .map(node => ({
+      title: node.querySelector('.title')?.textContent,
+      top: node.getBoundingClientRect().top
+    }))
+    .sort((a, b) => a.top - b.top)
+    .map(item => item.title))
+  expect(order).toEqual(['A', 'A 后面', 'B', 'C'])
 })
 
 test('backspace deletes the selected edge without removing nodes', async ({ page }) => {
@@ -252,6 +330,74 @@ test('saved positions on connected nodes are normalized back into auto layout', 
   ])
 })
 
+test('default view centers the visible graph vertically', async ({ page }) => {
+  const node = (id, title) => ({
+    id, title,
+    x: null,
+    y: null,
+    type: id === 'root' ? 'goal' : 'task',
+    status: 'todo',
+    description: '',
+    estimatedHours: null,
+    deadline: null,
+    collapsed: false,
+    detailOpen: false,
+    fill: null,
+    stroke: null
+  })
+  await page.evaluate(store => {
+    localStorage.setItem('taskdag-store', JSON.stringify(store))
+  }, {
+    version: 2,
+    currentId: 'g',
+    goals: [{
+      id: 'g',
+      goal: {
+        title: 'G',
+        edgeDirection: 'child-to-parent',
+        nodes: [
+          node('root', 'G'),
+          node('a', 'A'),
+          node('b', 'B'),
+          node('c', 'C')
+        ],
+        edges: [
+          { from: 'a', to: 'root' },
+          { from: 'b', to: 'root' },
+          { from: 'c', to: 'root' }
+        ]
+      }
+    }]
+  })
+  await page.reload()
+
+  const metrics = await page.evaluate(() => {
+    const rects = [...document.querySelectorAll('.node .card')]
+      .map(el => el.getBoundingClientRect())
+    const top = Math.min(...rects.map(r => r.top))
+    const bottom = Math.max(...rects.map(r => r.bottom))
+    return {
+      graphCenterY: (top + bottom) / 2,
+      viewportCenterY: window.innerHeight / 2
+    }
+  })
+  expect(Math.abs(metrics.graphCenterY - metrics.viewportCenterY)).toBeLessThan(2)
+})
+
+test('info button toggles the keyboard and mouse help', async ({ page }) => {
+  await expect(page.locator('#hint')).toBeHidden()
+  await expect(page.locator('#btnInfo')).toHaveAttribute('aria-expanded', 'false')
+
+  await page.locator('#btnInfo').click()
+  await expect(page.locator('#hint')).toBeVisible()
+  await expect(page.locator('#hint')).toContainText('双击节点编辑')
+  await expect(page.locator('#btnInfo')).toHaveAttribute('aria-expanded', 'true')
+
+  await page.mouse.click(600, 300)
+  await expect(page.locator('#hint')).toBeHidden()
+  await expect(page.locator('#btnInfo')).toHaveAttribute('aria-expanded', 'false')
+})
+
 test('drag preview arrow points from source toward target', async ({ page }) => {
   await page.locator('.node[data-id="root"] .card').click()
   await page.keyboard.press('Tab')
@@ -284,8 +430,8 @@ test('drag preview arrow points from source toward target', async ({ page }) => 
 
 test('dragging from A to B creates a source-to-target edge', async ({ page }) => {
   await page.locator('.node[data-id="root"] .card').dblclick()
-  await page.locator('.title-input').fill('Root')
-  await page.keyboard.press('Enter')
+  await page.locator('#stylePanel .sp-title').fill('Root')
+  await page.locator('#stylePanel .sp-title').press('Enter')
 
   await page.locator('.node[data-id="root"] .card').click()
   await page.keyboard.press('Tab')
@@ -357,14 +503,10 @@ test('ancestor collapse hides an already-collapsed child node', async ({ page })
   await expect(page.locator('.node.selected .collapse-btn')).toHaveText('2▸')
 })
 
-test('double-click renames a tall multi-line node without the edit closing itself', async ({ page }) => {
-  // a long title wraps to several lines, making the card taller than the
-  // single-line edit input. Entering edit mode shrinks the card, and a stray
-  // height-measurement re-render used to tear the focused input back out,
-  // committing instantly so the rename appeared to do nothing.
+test('double-click opens details and renames the node from the panel', async ({ page }) => {
   await page.locator('.node[data-id="root"] .card').dblclick()
-  await page.locator('.title-input').fill('创造有需求的东西，解决他们的问题，build：做成事情赚到钱')
-  await page.keyboard.press('Enter')
+  await page.locator('#stylePanel .sp-title').fill('创造有需求的东西，解决他们的问题，build：做成事情赚到钱')
+  await page.locator('#stylePanel .sp-title').press('Enter')
 
   // give the goal several predecessors so it matches the reported layout
   await page.locator('.node[data-id="root"] .card').click()
@@ -375,18 +517,12 @@ test('double-click renames a tall multi-line node without the edit closing itsel
   }
 
   await page.locator('.node[data-id="root"] .card').dblclick()
-  const editor = page.locator('.title-input')
+  const editor = page.locator('#stylePanel .sp-title')
   await expect(editor).toBeVisible()
-  await page.waitForTimeout(200) // outlast the async height-measurement re-render
-  await expect(editor).toBeVisible()
-
-  // the editor is a multi-line textarea grown to show the whole wrapped title,
-  // not a cramped single-line box
-  await expect(editor).toHaveJSProperty('tagName', 'TEXTAREA')
-  const lineHeight = 13.5 * 1.35
-  expect(await editor.evaluate(el => el.scrollHeight)).toBeGreaterThan(lineHeight * 2)
+  await expect(page.locator('.title-input')).toHaveCount(0)
 
   await editor.fill('改名成功')
-  await page.keyboard.press('Enter')
+  await editor.press('Enter')
   await expect(page.locator('.node[data-id="root"] .title')).toHaveText('改名成功')
+  await expect(page.locator('#goalName')).toHaveText('改名成功')
 })

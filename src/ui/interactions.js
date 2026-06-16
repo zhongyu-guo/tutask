@@ -8,7 +8,7 @@ import {
   appState, setGoal, setStore, selectNode, startEditing, stopEditing, rerender,
   undoGoal, redoGoal, storeWithCurrentLayoutOrder
 } from './state.js'
-import { render, ensureVisible, updateTransform, autosizeTitleInput, NODE_W, NODE_H } from './render.js'
+import { render, ensureVisible, updateTransform, autosizeTitleInput, centerVisibleNodes, NODE_W, NODE_H } from './render.js'
 import { reorderChildEdges, reorderEdgesByPlacement } from '../core/layout.js'
 import { bindFile, unbindFile } from './storage.js'
 import { openNodeStylePanel, openEdgeStylePanel, closeStylePanel } from './style-panel.js'
@@ -25,6 +25,13 @@ function screenToWorld(clientX, clientY) {
 
 function isTextTarget(target) {
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+function isComposingInput(e) {
+  const composingTarget = e.target?.dataset?.imeComposing === 'true'
+  const ignoreNextEnter = e.key === 'Enter' && e.target?.dataset?.ignoreNextEnter === 'true'
+  if (ignoreNextEnter) delete e.target.dataset.ignoreNextEnter
+  return e.isComposing || e.keyCode === 229 || composingTarget || ignoreNextEnter
 }
 
 function lastNodeId(goal) {
@@ -56,6 +63,19 @@ function createParallel() {
   let next = addNode(goal, { title: '', type: current.type })
   const newId = lastNodeId(next)
   for (const parent of parents) next = addEdge(next, newId, parent.id)
+  for (const parent of parents) {
+    const siblings = next.edges
+      .filter(e => e.to === parent.id)
+      .map(e => e.from)
+    const ordered = []
+    for (const id of siblings) {
+      if (id === newId) continue
+      ordered.push(id)
+      if (id === selected) ordered.push(newId)
+    }
+    if (!ordered.includes(newId)) ordered.push(newId)
+    next = reorderChildEdges(next, parent.id, ordered)
+  }
   setGoal(next)
   startEditing(newId, true)
   ensureVisible(newId)
@@ -160,6 +180,7 @@ function moveSelection(direction) {
 }
 
 function onKeydown(e) {
+  if (isComposingInput(e)) return
   const commandKey = e.metaKey || e.ctrlKey
   if (commandKey && e.key.toLowerCase() === 'z' && !isTextTarget(e.target)) {
     e.preventDefault()
@@ -300,7 +321,7 @@ function startNodeDrag(e, nodeEl) {
       }
     } else {
       selectNode(id)
-      openNodeStylePanel(id, ev.clientX, ev.clientY)
+      closeStylePanel()
     }
   }
   document.addEventListener('mousemove', onMove)
@@ -490,6 +511,35 @@ function setupGoalControl() {
       }
       if (!window.confirm(`删除整个 Goal「${appState.goal.title}」及其全部任务？此操作不可恢复。`)) return
       setStore(removeGoal(appState.store, appState.store.currentId))
+      return
+    }
+    if (action.id === 'btnBindFile') {
+      closeMenu()
+      handleBindFile()
+      return
+    }
+    if (action.id === 'fileStatus') {
+      closeMenu()
+      void (async () => {
+        if (!window.confirm('解除数据文件绑定？（文件保留，此后更改只存在浏览器本地）')) return
+        await unbindFile()
+        rerender()
+      })()
+      return
+    }
+    if (action.id === 'btnLayout') {
+      closeMenu()
+      resetLayout()
+      return
+    }
+    if (action.id === 'btnExport') {
+      closeMenu()
+      downloadExport()
+      return
+    }
+    if (action.id === 'btnImportJson') {
+      closeMenu()
+      document.getElementById('importFile').click()
     }
   })
 
@@ -501,6 +551,30 @@ function setupGoalControl() {
   })
 }
 
+function setupInfoControl() {
+  const button = document.getElementById('btnInfo')
+  const hint = document.getElementById('hint')
+
+  const setOpen = open => {
+    hint.hidden = !open
+    button.setAttribute('aria-expanded', open ? 'true' : 'false')
+  }
+
+  button.addEventListener('click', e => {
+    e.stopPropagation()
+    setOpen(hint.hidden)
+  })
+
+  document.addEventListener('mousedown', e => {
+    if (!hint.hidden && !e.target.closest('#infoControl') && !e.target.closest('#hint')) {
+      setOpen(false)
+    }
+  })
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !hint.hidden) setOpen(false)
+  })
+}
+
 // ---------- wiring ----------
 
 export function setupInteractions() {
@@ -508,6 +582,17 @@ export function setupInteractions() {
   const nodes = document.getElementById('nodes')
 
   document.addEventListener('keydown', onKeydown)
+  document.addEventListener('compositionstart', e => {
+    if (isTextTarget(e.target)) e.target.dataset.imeComposing = 'true'
+  }, true)
+  document.addEventListener('compositionend', e => {
+    if (!isTextTarget(e.target)) return
+    e.target.dataset.imeComposing = 'false'
+    e.target.dataset.ignoreNextEnter = 'true'
+    setTimeout(() => {
+      if (e.target?.dataset?.ignoreNextEnter === 'true') delete e.target.dataset.ignoreNextEnter
+    }, 250)
+  }, true)
   canvas.addEventListener('wheel', onWheel, { passive: false })
 
   canvas.addEventListener('mousedown', e => {
@@ -540,8 +625,8 @@ export function setupInteractions() {
     if (isTextTarget(e.target)) return
     const card = e.target.closest('.card')
     if (card) {
-      closeStylePanel() // the first click of the dblclick opened it
-      startEditing(card.dataset.id)
+      const rect = card.getBoundingClientRect()
+      openNodeStylePanel(card.dataset.id, rect.right, rect.top)
     }
   })
 
@@ -596,12 +681,7 @@ export function setupInteractions() {
   })
 
   setupGoalControl()
-  document.getElementById('btnBindFile').addEventListener('click', handleBindFile)
-  document.getElementById('fileStatus').addEventListener('click', async () => {
-    if (!window.confirm('解除数据文件绑定？（文件保留，此后更改只存在浏览器本地）')) return
-    await unbindFile()
-    rerender()
-  })
+  setupInfoControl()
   document.getElementById('btnFileReconnect').addEventListener('click', async () => {
     const resume = appState.fileReconnect
     if (!resume) return
@@ -617,15 +697,11 @@ export function setupInteractions() {
       window.alert('连接失败：' + error.message)
     }
   })
-  document.getElementById('btnLayout').addEventListener('click', resetLayout)
-  document.getElementById('btnExport').addEventListener('click', downloadExport)
   document.getElementById('importFile').addEventListener('change', e => {
     if (e.target.files[0]) handleImportFile(e.target.files[0])
     e.target.value = ''
   })
   document.getElementById('btnZoomReset').addEventListener('click', () => {
-    appState.zoom = 1
-    appState.pan = { x: 80, y: Math.round(document.getElementById('canvas').clientHeight / 2) }
-    updateTransform()
+    centerVisibleNodes({ resetZoom: true })
   })
 }
