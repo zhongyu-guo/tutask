@@ -95,7 +95,7 @@ function nodeClasses(goal, node) {
 
 function renderTitle(node) {
   if (appState.editingId === node.id) {
-    return `<input class="title-input" data-id="${node.id}" value="">`
+    return `<textarea class="title-input" data-id="${node.id}" rows="1"></textarea>`
   }
   return `<div class="title"></div>`
 }
@@ -189,7 +189,15 @@ export function render() {
   if (editing) {
     editing.focus()
     editing.select()
+    autosizeTitleInput(editing)
   }
+}
+
+// grow the multi-line title editor to fit its content so the whole (often
+// wrapped) title stays visible while editing, instead of a cramped one-liner
+export function autosizeTitleInput(el) {
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
 }
 
 function syncMeasuredNodeHeights(layer, visible) {

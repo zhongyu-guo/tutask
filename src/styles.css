@@ -116,8 +116,11 @@ body {
 
 .node .title { font-size: 13.5px; line-height: 1.35; word-break: break-word; }
 .title-input {
-  font-size: 13.5px; width: 100%; border: 1px solid var(--doing);
-  border-radius: 4px; padding: 2px 4px; font-family: inherit;
+  font-size: 13.5px; line-height: 1.35; width: 100%;
+  border: 1px solid var(--doing); border-radius: 4px;
+  padding: 2px 4px; font-family: inherit; box-sizing: border-box;
+  resize: none; overflow: hidden; display: block;
+  white-space: pre-wrap; word-break: break-word;
 }
 .badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .badge { font-size: 11px; color: var(--muted); background: #f0f2f5; border-radius: 4px; padding: 1px 5px; }
