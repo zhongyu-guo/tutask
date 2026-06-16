@@ -202,6 +202,11 @@ function syncMeasuredNodeHeights(layer, visible) {
   }
   for (const el of layer.querySelectorAll('.node')) {
     const id = el.dataset.id
+    // a node being edited shows a single-line input, not its real content;
+    // measuring that transient height would reflow the layout and trigger a
+    // re-render that tears the focused input out mid-edit (closing it). Keep
+    // the last real height until editing ends and the title is measured again.
+    if (id === appState.editingId) continue
     const height = Math.ceil(el.querySelector('.card')?.getBoundingClientRect().height ?? NODE_H)
     if (Math.abs((appState.nodeHeights.get(id) ?? NODE_H) - height) > 1) {
       appState.nodeHeights.set(id, height)
