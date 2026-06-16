@@ -162,17 +162,29 @@ export function render() {
   }
   syncMeasuredNodeHeights(layer, visible)
 
-  const titleInput = document.getElementById('goalTitle')
-  if (document.activeElement !== titleInput) titleInput.value = goal.title
+  const goalName = document.getElementById('goalName')
+  goalName.textContent = goal.title || '（未命名）'
+  const goalNameInput = document.getElementById('goalNameInput')
+  if (document.activeElement !== goalNameInput) goalNameInput.value = goal.title
 
-  const select = document.getElementById('goalSelect')
-  select.innerHTML = ''
+  const menu = document.getElementById('goalMenu')
+  menu.innerHTML = ''
   for (const entry of appState.store.goals) {
-    const option = document.createElement('option')
-    option.value = entry.id
-    option.textContent = entry.goal.title || '（未命名）'
-    option.selected = entry.id === appState.store.currentId
-    select.appendChild(option)
+    const item = document.createElement('button')
+    item.className = 'goal-menu-item' + (entry.id === appState.store.currentId ? ' current' : '')
+    item.dataset.id = entry.id
+    item.textContent = entry.goal.title || '（未命名）'
+    menu.appendChild(item)
+  }
+  const sep = document.createElement('div')
+  sep.className = 'goal-menu-sep'
+  menu.appendChild(sep)
+  for (const [id, label] of [['goalMenuNew', '＋ 新建 Goal'], ['goalMenuDelete', '🗑 删除当前 Goal']]) {
+    const action = document.createElement('button')
+    action.id = id
+    action.className = 'goal-menu-action'
+    action.textContent = label
+    menu.appendChild(action)
   }
 
   const fileStatus = document.getElementById('fileStatus')

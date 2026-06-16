@@ -32,12 +32,41 @@ body {
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(6px);
 }
-#goalTitle {
-  font-size: 15px; font-weight: 700; color: var(--goal);
-  border: 1px solid transparent; border-radius: 6px;
-  padding: 5px 8px; min-width: 220px; background: transparent;
+#goalControl {
+  position: relative; display: flex; align-items: center;
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
 }
-#goalTitle:hover, #goalTitle:focus { border-color: var(--border); background: #fff; outline: none; }
+#goalName, #goalNameInput {
+  font-size: 15px; font-weight: 700; color: var(--goal);
+  padding: 5px 6px 5px 10px; min-width: 160px; max-width: 320px;
+}
+#goalName {
+  cursor: text; border-radius: 7px 0 0 7px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#goalName:hover { background: #f0f2f5; }
+#goalNameInput { border: none; outline: none; background: transparent; }
+#goalMenuBtn {
+  border: none; background: none; color: var(--muted);
+  font-size: 13px; padding: 7px 10px 7px 6px; border-radius: 0 7px 7px 0; cursor: pointer;
+}
+#goalMenuBtn:hover { background: #f0f2f5; }
+#goalMenu {
+  position: absolute; top: 100%; left: 0; margin-top: 5px; z-index: 30;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14); padding: 4px; min-width: 220px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+#goalMenu button {
+  display: block; width: 100%; text-align: left; font-family: inherit;
+  font-size: 13px; padding: 7px 10px; border: none; background: none;
+  border-radius: 6px; cursor: pointer; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#goalMenu button:hover { background: #f0f2f5; }
+#goalMenu .goal-menu-item.current { font-weight: 700; color: var(--goal); }
+#goalMenu .goal-menu-item.current::after { content: ' ✓'; }
+#goalMenu .goal-menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
 #toolbar .spacer { flex: 1; }
 #toolbar button, #toolbar label.btn {
   font-size: 13px; padding: 6px 12px; cursor: pointer;
@@ -56,10 +85,6 @@ body {
 #fileReconnectBar button {
   margin-left: 10px; font-size: 12px; cursor: pointer;
   border: 1px solid #93c5fd; background: #fff; border-radius: 4px; padding: 2px 8px;
-}
-#goalSelect {
-  font-size: 13px; padding: 5px 6px; max-width: 180px;
-  border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text);
 }
 #fileStatus {
   font-size: 12px; color: #166534; background: #dcfce7;
