@@ -429,6 +429,73 @@ function resetLayout() {
   setGoal(next)
 }
 
+// ---------- goal title control: inline rename + switch/new/delete menu ----------
+
+function setupGoalControl() {
+  const name = document.getElementById('goalName')
+  const input = document.getElementById('goalNameInput')
+  const menu = document.getElementById('goalMenu')
+  const menuBtn = document.getElementById('goalMenuBtn')
+
+  const closeMenu = () => { menu.hidden = true }
+  const showRename = () => {
+    input.value = appState.goal.title
+    name.hidden = true
+    input.hidden = false
+    input.focus()
+    input.select()
+  }
+  const endRename = (commit) => {
+    if (input.hidden) return
+    input.hidden = true
+    name.hidden = false
+    const title = input.value.trim() || appState.goal.title
+    if (commit && title !== appState.goal.title) {
+      setStore(renameCurrentGoal(appState.store, title))
+    }
+  }
+
+  name.addEventListener('click', showRename)
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); endRename(true) }
+    else if (e.key === 'Escape') { e.preventDefault(); endRename(false) }
+    e.stopPropagation()
+  })
+  input.addEventListener('blur', () => endRename(true))
+
+  menuBtn.addEventListener('click', e => {
+    e.stopPropagation()
+    menu.hidden = !menu.hidden
+  })
+  menu.addEventListener('click', e => {
+    const item = e.target.closest('.goal-menu-item')
+    if (item) { closeMenu(); setStore(switchGoal(appState.store, item.dataset.id)); return }
+    if (e.target.id === 'goalMenuNew') {
+      closeMenu()
+      const newName = window.prompt('新 Goal 的名称：', '新目标')
+      if (newName === null) return
+      setStore(addGoal(appState.store, createGoal(newName.trim() || '新目标')))
+      return
+    }
+    if (e.target.id === 'goalMenuDelete') {
+      closeMenu()
+      if (appState.store.goals.length === 1) {
+        window.alert('至少保留一个 Goal，无法删除')
+        return
+      }
+      if (!window.confirm(`删除整个 Goal「${appState.goal.title}」及其全部任务？此操作不可恢复。`)) return
+      setStore(removeGoal(appState.store, appState.store.currentId))
+    }
+  })
+
+  document.addEventListener('mousedown', e => {
+    if (!menu.hidden && !e.target.closest('#goalControl')) closeMenu()
+  })
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !menu.hidden) closeMenu()
+  })
+}
+
 // ---------- wiring ----------
 
 export function setupInteractions() {
@@ -523,26 +590,7 @@ export function setupInteractions() {
     }
   })
 
-  document.getElementById('goalTitle').addEventListener('change', e => {
-    const title = e.target.value.trim() || appState.goal.title
-    setStore(renameCurrentGoal(appState.store, title))
-  })
-  document.getElementById('goalSelect').addEventListener('change', e => {
-    setStore(switchGoal(appState.store, e.target.value))
-  })
-  document.getElementById('btnNewGoal').addEventListener('click', () => {
-    const name = window.prompt('新 Goal 的名称：', '新目标')
-    if (name === null) return
-    setStore(addGoal(appState.store, createGoal(name.trim() || '新目标')))
-  })
-  document.getElementById('btnDeleteGoal').addEventListener('click', () => {
-    if (appState.store.goals.length === 1) {
-      window.alert('至少保留一个 Goal，无法删除')
-      return
-    }
-    if (!window.confirm(`删除整个 Goal「${appState.goal.title}」及其全部任务？此操作不可恢复。`)) return
-    setStore(removeGoal(appState.store, appState.store.currentId))
-  })
+  setupGoalControl()
   document.getElementById('btnBindFile').addEventListener('click', handleBindFile)
   document.getElementById('fileStatus').addEventListener('click', async () => {
     if (!window.confirm('解除数据文件绑定？（文件保留，此后更改只存在浏览器本地）')) return

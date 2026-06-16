@@ -10,10 +10,12 @@
 </head>
 <body>
 <div id="toolbar">
-  <select id="goalSelect" title="切换 Goal"></select>
-  <button id="btnNewGoal" title="新建 Goal">＋</button>
-  <button id="btnDeleteGoal" title="删除当前 Goal">🗑</button>
-  <input id="goalTitle" title="Goal 标题（改名）" placeholder="目标名称">
+  <div id="goalControl">
+    <span id="goalName" tabindex="0" title="点击重命名"></span>
+    <input id="goalNameInput" title="Goal 标题（改名）" placeholder="目标名称" hidden>
+    <button id="goalMenuBtn" title="切换 / 新建 / 删除 Goal" aria-label="Goal 菜单">▾</button>
+    <div id="goalMenu" hidden></div>
+  </div>
   <div class="spacer"></div>
   <span id="fileStatus" title="点击解除绑定" hidden></span>
   <button id="btnBindFile" title="绑定 goals 数据目录（每个 Goal 一个 JSON 文件），localhost 与本地双击打开共用同一份数据">绑定数据目录</button>
