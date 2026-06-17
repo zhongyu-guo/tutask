@@ -205,6 +205,18 @@ function renderCollapseBtn(goal, node) {
   return `<button class="collapse-btn" data-id="${node.id}" title="收起前序步骤">▾</button>`
 }
 
+// Keep selection honest: a node hidden by collapse/pause must not linger as a
+// phantom selection, or keyboard shortcuts (Enter / Delete / Space) would target
+// something invisible.
+function pruneSelectionToVisible(visible) {
+  for (const id of [...appState.selectedIds]) {
+    if (!visible.has(id)) appState.selectedIds.delete(id)
+  }
+  if (appState.selectedId && !visible.has(appState.selectedId)) {
+    appState.selectedId = appState.selectedIds.values().next().value ?? null
+  }
+}
+
 export function render() {
   const goal = appState.goal
   const hidden = hiddenByCollapse(goal)
@@ -217,6 +229,7 @@ export function render() {
   const positions = applyLayoutDirection(resolvePositions(goal, auto))
   appState.lastPositions = positions
   appState.lastVisible = visible
+  pruneSelectionToVisible(visible)
 
   renderEdges(document.getElementById('edges'), goal, positions, visible)
 

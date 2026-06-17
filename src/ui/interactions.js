@@ -32,6 +32,17 @@ function isTextTarget(target) {
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
+// A control where typing (and Enter) carries native text meaning. Selects and
+// date pickers are focusable text targets, but Enter has no text role there, so
+// global shortcuts (Enter = parallel, Tab = successor) should still fire.
+function isTextEntryTarget(target) {
+  if (!isTextTarget(target)) return false
+  if (target.tagName === 'TEXTAREA') return true
+  if (target.tagName === 'SELECT') return false
+  const type = (target.getAttribute('type') || 'text').toLowerCase()
+  return ['text', 'search', 'url', 'email', 'tel', 'password', 'number'].includes(type)
+}
+
 function releaseHiddenFocus() {
   const active = document.activeElement
   if (active?.closest?.('[hidden]')) active.blur()
@@ -209,8 +220,16 @@ function onKeydown(e) {
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); commitEdit(e.target) }
       if (e.key === 'Escape') { e.preventDefault(); cancelEdit() }
       e.stopPropagation()
+      return
     }
-    return
+    // Free-text fields (e.g. the detail-panel name) own all their keys.
+    if (isTextEntryTarget(e.target)) return
+    // Non-text panel controls (status select, deadline picker): leave arrows and
+    // typing with the control, but release it so creation shortcuts reach the
+    // still-selected node instead of being silently swallowed.
+    if (e.key !== 'Enter' && e.key !== 'Tab') return
+    if (e.target.closest?.('#stylePanel')) closeStylePanel()
+    else e.target.blur?.()
   }
   switch (e.key) {
     case 'Tab': e.preventDefault(); createSuccessor(); break
@@ -739,6 +758,14 @@ export function setupInteractions() {
     setTimeout(() => {
       if (e.target?.dataset?.ignoreNextEnter === 'true') delete e.target.dataset.ignoreNextEnter
     }, 250)
+  }, true)
+  // A field that loses focus must not keep a stale IME flag, or it would keep
+  // swallowing Enter the next time keyboard creation runs against it.
+  document.addEventListener('focusout', e => {
+    const data = e.target?.dataset
+    if (!data) return
+    delete data.imeComposing
+    delete data.ignoreNextEnter
   }, true)
   canvas.addEventListener('wheel', onWheel, { passive: false })
 

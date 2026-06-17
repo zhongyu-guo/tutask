@@ -750,3 +750,49 @@ test('keyboard creation still works after closing the detail panel', async ({ pa
   await page.keyboard.press('Tab')
   await expect(page.locator('.title-input')).toBeVisible()
 })
+
+test('Enter creates a parallel node while focus sits in an open detail-panel field', async ({ page }) => {
+  // build root → A
+  await page.locator('.node[data-id="root"] .card').click()
+  await page.keyboard.press('Tab')
+  await page.locator('.title-input').fill('A')
+  await page.keyboard.press('Enter')
+
+  // open the detail panel on A and move focus into the deadline picker
+  await selectNodeByTitle(page, 'A')
+  await page.locator('.node.selected .card').dblclick()
+  await page.locator('#stylePanel .f-deadline').focus()
+  await expect(page.locator('#stylePanel')).toBeVisible()
+
+  // the panel field must not swallow the creation shortcut
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#stylePanel')).toBeHidden()
+  await expect(page.locator('.title-input')).toBeVisible()
+  await page.locator('.title-input').fill('B')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.node')).toHaveCount(3) // root, A, B
+})
+
+test('collapsing a chain drops a now-hidden node from the selection', async ({ page }) => {
+  // build root → A → B so that B is a prerequisite hidden when A collapses
+  await page.locator('.node[data-id="root"] .card').click()
+  for (const name of ['A', 'B']) {
+    await page.keyboard.press('Tab')
+    await page.locator('.title-input').fill(name)
+    await page.keyboard.press('Enter')
+  }
+
+  await selectNodeByTitle(page, 'B')
+  await expect(page.locator('.node.selected .title')).toHaveText('B')
+
+  // collapse A's prerequisite subtree → B is hidden, so its selection is stale
+  await page.locator('.node', { has: page.locator('.title', { hasText: 'A' }) })
+    .locator('.collapse-btn').click()
+  await expect(page.locator('.node')).toHaveCount(2) // root, A
+
+  // Delete must not act on the now-hidden B: the phantom selection is cleared
+  await page.keyboard.press('Delete')
+  await page.locator('.collapse-btn.collapsed').click() // expand again
+  await expect(page.locator('.node')).toHaveCount(3) // root, A, B all intact
+  await expect(page.locator('.node .title', { hasText: 'B' })).toBeVisible()
+})
