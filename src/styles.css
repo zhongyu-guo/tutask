@@ -210,6 +210,7 @@ body {
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
   backdrop-filter: blur(10px);
 }
+#timelineControls[hidden] { display: none !important; }
 .tl-seg {
   display: inline-flex; background: #fff;
   border: 1px solid var(--border); border-radius: 8px; overflow: hidden;

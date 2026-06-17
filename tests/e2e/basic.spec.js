@@ -127,6 +127,19 @@ test('command-click toggles multiple selected nodes', async ({ page }) => {
   await expect(page.locator('.node.selected')).toHaveAttribute('data-id', 'root')
 })
 
+test('timeline scale controls are only visible in timeline mode', async ({ page }) => {
+  const timelineControls = page.locator('#timelineControls')
+  await expect(timelineControls).toBeHidden()
+
+  await page.locator('#btnTimeline').click()
+  await expect(timelineControls).toBeVisible()
+  await expect(page.locator('#tlScale button.on')).toHaveText('日')
+  await expect(page.locator('#tlRange button.on')).toHaveText('连续')
+
+  await page.locator('#btnTimeline').click()
+  await expect(timelineControls).toBeHidden()
+})
+
 test('dragging a node onto another node proposes and replaces its parent connection', async ({ page }) => {
   await page.locator('.node[data-id="root"] .card').click()
   await page.keyboard.press('Tab')
