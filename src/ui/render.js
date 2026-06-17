@@ -276,11 +276,14 @@ export function render() {
   let visible
   let axis = null
   if (timeline) {
-    visible = new Set(goal.nodes.map(n => n.id))
+    // honor the current collapse state: only currently-visible nodes appear
+    const hidden = hiddenByCollapse(goal)
+    visible = new Set(goal.nodes.filter(n => !hidden.has(n.id)).map(n => n.id))
     const tl = timelineLayout(goal, {
       scale: appState.timelineScale,
       range: appState.timelineRange,
       today: new Date(),
+      visible,
       colWidth: TL_COL_W,
       rowHeight: TL_ROW_H,
       headerHeight: TL_HEADER_H

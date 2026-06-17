@@ -137,6 +137,28 @@ describe('timelineLayout — positions', () => {
   })
 })
 
+describe('timelineLayout — visibility', () => {
+  it('places only nodes in the visible set (respecting collapse)', () => {
+    const { goal, ids } = buildGoal({ A: '2026-06-20', B: '2026-06-20', C: null })
+    const visible = new Set(['root', ids.A]) // B and C hidden by collapse
+    const { positions, axis } = timelineLayout(goal, {
+      scale: 'day', range: 'compact', today: TODAY, visible
+    })
+    expect(positions.has(ids.A)).toBe(true)
+    expect(positions.has(ids.B)).toBe(false)
+    expect(positions.has(ids.C)).toBe(false)
+    expect(axis.noDate.ids).toContain('root')
+    expect(axis.noDate.ids).not.toContain(ids.C)
+  })
+
+  it('includes all nodes when no visible set is given', () => {
+    const { goal, ids } = buildGoal({ A: '2026-06-20', B: '2026-06-20' })
+    const { positions } = timelineLayout(goal, { scale: 'day', range: 'compact', today: TODAY })
+    expect(positions.has(ids.A)).toBe(true)
+    expect(positions.has(ids.B)).toBe(true)
+  })
+})
+
 describe('columnForX', () => {
   it('snaps an x coordinate to the column that contains it', () => {
     const { goal } = buildGoal({ A: '2026-06-16', B: '2026-06-18' })

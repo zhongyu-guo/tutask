@@ -134,9 +134,11 @@ export function timelineLayout(goal, opts = {}) {
   } = opts
   const width = (opts.colWidth ?? DEFAULTS.colWidth)[scale] ?? DEFAULTS.colWidth[scale]
 
+  const visible = opts.visible ?? null
+  const inView = id => !visible || visible.has(id)
   const nodeById = new Map(goal.nodes.map(n => [n.id, n]))
-  const dated = goal.nodes.filter(n => n.deadline)
-  const undatedIds = goal.nodes.filter(n => !n.deadline).map(n => n.id)
+  const dated = goal.nodes.filter(n => n.deadline && inView(n.id))
+  const undatedIds = goal.nodes.filter(n => !n.deadline && inView(n.id)).map(n => n.id)
 
   const groups = groupByBucket(dated, scale)
   const todayAnchor = bucketAnchor(today, scale)
