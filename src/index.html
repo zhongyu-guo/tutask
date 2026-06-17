@@ -18,6 +18,25 @@
   </div>
 </div>
 <div id="cornerControls">
+  <div id="timelineControls" hidden role="group" aria-label="时间轴设置">
+    <div class="tl-seg" id="tlScale" role="group" aria-label="时间尺度">
+      <button data-scale="day" title="按天">日</button>
+      <button data-scale="week" title="按周">周</button>
+      <button data-scale="month" title="按月">月</button>
+    </div>
+    <div class="tl-seg" id="tlRange" role="group" aria-label="轴范围">
+      <button data-range="continuous" title="连续：含空列，距离成比例">连续</button>
+      <button data-range="compact" title="紧凑：只画有任务的时间桶">紧凑</button>
+    </div>
+  </div>
+  <button id="btnTimeline" title="切换时间轴布局" aria-label="切换时间轴布局" aria-pressed="false">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 12h18"></path>
+      <path d="M6 8v8"></path>
+      <path d="M12 8v8"></path>
+      <path d="M18 8v8"></path>
+    </svg>
+  </button>
   <button id="btnDirection" title="切换展示方向" aria-label="切换展示方向" aria-pressed="false">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M8 7H4l4-4"></path>
@@ -50,6 +69,7 @@
 </div>
 <div id="canvas">
   <div id="world">
+    <div id="ruler" hidden></div>
     <svg id="edges"></svg>
     <div id="nodes"></div>
   </div>

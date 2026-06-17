@@ -1,5 +1,6 @@
 import { predecessorsOf, hiddenByCollapse, collapsedCount, nodeType, isReady } from '../core/graph.js'
 import { autoLayout, resolvePositions } from '../core/layout.js'
+import { timelineLayout, countdownLabel } from '../core/timeline-layout.js'
 import { appState } from './state.js'
 import { fileBound, boundFileName, fileApiAvailable } from './storage.js'
 
@@ -8,6 +9,13 @@ export const NODE_H = 64
 export const DEFAULT_PAN_X = 80
 const GAP_X = 300
 const GAP_Y = 104
+
+// timeline layout: row pitch and column widths (must exceed NODE_W). TL_PAD is
+// the visual gutter each column band extends past the node on the left.
+const TL_ROW_H = NODE_H + 40
+const TL_HEADER_H = 56
+const TL_PAD = 16
+const TL_COL_W = { day: NODE_W + 2 * TL_PAD, week: NODE_W + 2 * TL_PAD + 24, month: NODE_W + 2 * TL_PAD + 48 }
 
 function isOverdue(node) {
   if (!node.deadline || node.status === 'done') return false
@@ -187,9 +195,53 @@ function renderTitle(node) {
 function renderBadges(node) {
   let html = ''
   if (node.deadline) {
-    html += `<span class="badge deadline${isOverdue(node) ? ' overdue' : ''}">📅 ${node.deadline}</span>`
+    const countdown = countdownLabel(node.deadline, new Date())
+    html += `<span class="badge deadline${isOverdue(node) ? ' overdue' : ''}">📅 ${node.deadline}` +
+      `<span class="badge-countdown">${countdown}</span></span>`
   }
   return html ? `<div class="badges">${html}</div>` : ''
+}
+
+// the time ruler: column bands + headers + a no-DDL lane, drawn behind edges
+// and nodes. Labels come from axis metadata (dates only — no user input).
+function renderRuler(axis) {
+  const ruler = document.getElementById('ruler')
+  if (!axis) {
+    ruler.hidden = true
+    ruler.innerHTML = ''
+    return
+  }
+  ruler.hidden = false
+  const h = axis.contentHeight
+  const band = (left, width, cls, primary, secondary) =>
+    `<div class="tl-col${cls}" style="left:${left}px;width:${width}px;height:${h}px">
+      <div class="tl-head" style="height:${TL_HEADER_H}px">
+        <span class="tl-head-primary">${primary}</span>
+        <span class="tl-head-secondary">${secondary}</span>
+      </div>
+    </div>`
+  let html = ''
+  for (const col of axis.columns) {
+    const cls = (col.isToday ? ' today' : '') + (col.isEmpty ? ' empty' : '')
+    const primary = col.isToday ? '今天' : col.label.primary
+    const secondary = col.isToday ? col.label.primary : col.label.secondary
+    html += band(col.x - TL_PAD, col.width, cls, primary, secondary)
+  }
+  html += band(axis.noDate.x - TL_PAD, axis.noDate.width, ' nodate', '无 DDL', '未排期')
+  ruler.innerHTML = html
+}
+
+function syncTimelineControls(timeline) {
+  const btn = document.getElementById('btnTimeline')
+  btn.setAttribute('aria-pressed', timeline ? 'true' : 'false')
+  btn.title = timeline ? '切回 DAG 布局' : '切换时间轴布局'
+  document.getElementById('timelineControls').hidden = !timeline
+  for (const el of document.querySelectorAll('#tlScale button')) {
+    el.classList.toggle('on', el.dataset.scale === appState.timelineScale)
+  }
+  for (const el of document.querySelectorAll('#tlRange button')) {
+    el.classList.toggle('on', el.dataset.range === appState.timelineRange)
+  }
 }
 
 function renderCollapseBtn(goal, node) {
@@ -207,17 +259,36 @@ function renderCollapseBtn(goal, node) {
 
 export function render() {
   const goal = appState.goal
-  const hidden = hiddenByCollapse(goal)
-  const visible = new Set(goal.nodes.filter(n => !hidden.has(n.id)).map(n => n.id))
-  const detailHeights = Object.fromEntries([...appState.nodeHeights.entries()]
-    .filter(([id, height]) => visible.has(id) && height > NODE_H)
-    .map(([id, height]) => [id, height - NODE_H]))
-
-  const auto = autoLayout(goal, visible, { gapX: GAP_X, gapY: GAP_Y, detailHeights })
-  const positions = applyLayoutDirection(resolvePositions(goal, auto))
+  const timeline = appState.layoutMode === 'timeline'
+  let positions
+  let visible
+  let axis = null
+  if (timeline) {
+    visible = new Set(goal.nodes.map(n => n.id))
+    const tl = timelineLayout(goal, {
+      scale: appState.timelineScale,
+      range: appState.timelineRange,
+      today: new Date(),
+      colWidth: TL_COL_W,
+      rowHeight: TL_ROW_H,
+      headerHeight: TL_HEADER_H
+    })
+    positions = tl.positions
+    axis = tl.axis
+  } else {
+    const hidden = hiddenByCollapse(goal)
+    visible = new Set(goal.nodes.filter(n => !hidden.has(n.id)).map(n => n.id))
+    const detailHeights = Object.fromEntries([...appState.nodeHeights.entries()]
+      .filter(([id, height]) => visible.has(id) && height > NODE_H)
+      .map(([id, height]) => [id, height - NODE_H]))
+    const auto = autoLayout(goal, visible, { gapX: GAP_X, gapY: GAP_Y, detailHeights })
+    positions = applyLayoutDirection(resolvePositions(goal, auto))
+  }
   appState.lastPositions = positions
   appState.lastVisible = visible
+  appState.timelineAxis = axis
 
+  renderRuler(axis)
   renderEdges(document.getElementById('edges'), goal, positions, visible)
 
   const layer = document.getElementById('nodes')
@@ -226,12 +297,12 @@ export function render() {
     if (!visible.has(node.id)) continue
     const pos = positions.get(node.id)
     const el = document.createElement('div')
-    el.className = nodeClasses(goal, node)
+    el.className = nodeClasses(goal, node) + (timeline ? ' tl-node' : '')
     el.dataset.id = node.id
     el.style.left = pos.x + 'px'
     el.style.top = pos.y + 'px'
     el.innerHTML = `
-      ${renderCollapseBtn(goal, node)}
+      ${timeline ? '' : renderCollapseBtn(goal, node)}
       <div class="card" data-id="${node.id}">
         ${renderTitle(node)}
         ${renderBadges(node)}
@@ -260,6 +331,7 @@ export function render() {
   directionBtn.title = appState.layoutDirection === 'rtl'
     ? '切换为 Goal → Project → Task'
     : '切换为 Task ← Project ← Goal'
+  syncTimelineControls(timeline)
 
   updateTransform()
 

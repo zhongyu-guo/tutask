@@ -10,6 +10,7 @@ import {
 } from './state.js'
 import { render, ensureVisible, updateTransform, autosizeTitleInput, centerVisibleNodes, NODE_W, NODE_H } from './render.js'
 import { reorderChildEdges, reorderEdgesByPlacement } from '../core/layout.js'
+import { columnForX, formatDeadline } from '../core/timeline-layout.js'
 import { bindFile, unbindFile } from './storage.js'
 import { openNodeStylePanel, openEdgeStylePanel, closeStylePanel } from './style-panel.js'
 import {
@@ -395,6 +396,57 @@ function realignDuringDrag(id, dragY) {
   return true
 }
 
+// Timeline mode: horizontal drag re-schedules. The node snaps to whichever
+// column its center lands in and its deadline becomes that column's anchor
+// date; dropping onto the no-DDL lane clears the deadline. Vertical motion is
+// ignored (in-column order is computed from status). Positions are never
+// written to the node — render recomputes them from deadline.
+function startTimelineDrag(e, nodeEl) {
+  const id = nodeEl.dataset.id
+  const additiveSelection = e.metaKey || e.ctrlKey
+  if (id === 'root') {
+    selectNode(id, { additive: additiveSelection })
+    closeStylePanel()
+    return
+  }
+  const startMouse = screenToWorld(e.clientX, e.clientY)
+  const startLeft = parseFloat(nodeEl.style.left)
+  const startTop = parseFloat(nodeEl.style.top)
+  let moved = false
+
+  function onMove(ev) {
+    const current = screenToWorld(ev.clientX, ev.clientY)
+    const dx = current.x - startMouse.x
+    const dy = current.y - startMouse.y
+    if (!moved && Math.hypot(dx, dy) * appState.zoom < 4) return
+    moved = true
+    nodeEl.style.left = startLeft + dx + 'px'
+    nodeEl.style.top = startTop + dy + 'px'
+  }
+  function onUp(ev) {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    if (!moved) {
+      selectNode(id, { additive: additiveSelection })
+      closeStylePanel()
+      return
+    }
+    const axis = appState.timelineAxis
+    if (!axis) { rerender(); return }
+    const current = screenToWorld(ev.clientX, ev.clientY)
+    const centerX = startLeft + (current.x - startMouse.x) + NODE_W / 2
+    if (centerX >= axis.noDate.x) {
+      setGoal(updateNode(appState.goal, id, { deadline: null }))
+      return
+    }
+    const col = columnForX(centerX, axis)
+    if (col) setGoal(updateNode(appState.goal, id, { deadline: formatDeadline(col.anchor) }))
+    else rerender()
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
 function startNodeDrag(e, nodeEl) {
   const id = nodeEl.dataset.id
   const additiveSelection = e.metaKey || e.ctrlKey
@@ -709,6 +761,25 @@ function setupInfoControl() {
   })
 }
 
+function setupTimelineControls() {
+  document.getElementById('btnTimeline').addEventListener('click', () => {
+    appState.layoutMode = appState.layoutMode === 'timeline' ? 'dag' : 'timeline'
+    rerender()
+    centerVisibleNodes()
+  })
+  const onSegClick = (containerId, key, attr) => {
+    document.getElementById(containerId).addEventListener('click', e => {
+      const btn = e.target.closest('button')
+      if (!btn) return
+      appState[key] = btn.dataset[attr]
+      rerender()
+      centerVisibleNodes()
+    })
+  }
+  onSegClick('tlScale', 'timelineScale', 'scale')
+  onSegClick('tlRange', 'timelineRange', 'range')
+}
+
 function setupDirectionControl() {
   document.getElementById('btnDirection').addEventListener('click', () => {
     appState.layoutDirection = appState.layoutDirection === 'rtl' ? 'ltr' : 'rtl'
@@ -765,7 +836,10 @@ export function setupInteractions() {
     }
     if (isTextTarget(e.target) || e.target.tagName === 'BUTTON') return
     const nodeEl = e.target.closest('.node')
-    if (nodeEl) startNodeDrag(e, nodeEl)
+    if (nodeEl) {
+      if (appState.layoutMode === 'timeline') startTimelineDrag(e, nodeEl)
+      else startNodeDrag(e, nodeEl)
+    }
   })
 
   nodes.addEventListener('dblclick', e => {
@@ -832,6 +906,7 @@ export function setupInteractions() {
 
   setupGoalControl()
   setupDirectionControl()
+  setupTimelineControls()
   setupInfoControl()
   document.getElementById('btnFileReconnect').addEventListener('click', async () => {
     const resume = appState.fileReconnect
