@@ -1,6 +1,6 @@
 # 技术架构
 
-Task DAG 是一个零运行时依赖的浏览器单页工具。源码按 ESM 模块组织，构建时由 esbuild 解析依赖图并 bundle 成单段脚本，再和 CSS 一起内联进 `dist/index.html`。
+tutask 是一个零运行时依赖的浏览器单页工具。源码按 ESM 模块组织，构建时由 esbuild 解析依赖图并 bundle 成单段脚本，再和 CSS 一起内联进 `dist/index.html`。
 
 ## 分层
 

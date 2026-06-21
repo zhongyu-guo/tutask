@@ -1,42 +1,76 @@
-# Task DAG — 依赖关系驱动的任务管理工具
+# tutask
 
-把一个 Goal 按依赖关系拆分为 Project 和 Task 的单页流程图工具。
-连线即依赖，整张图是一个 DAG；操作方式类似思维导图。
-数据中的连线方向固定为 `from = 子节点 / 前序步骤`、`to = 父节点 / 被实现的节点`，
-画布上箭头也按子节点指向父节点绘制；布局按这个唯一关系渲染，子节点在父节点右侧。
+> 把一个目标，按"谁依赖谁"拆成一张可执行的依赖图。连线即依赖，整张图是一个 DAG，操作手感接近思维导图。
+> **既是给人看的可视化画布，也是给 AI 操作的结构化数据契约。**
 
-**交付物是一个零依赖的单 HTML 文件**：`npm run build` 后双击
-`dist/index.html` 即可使用，数据自动保存在浏览器 localStorage，
-支持导出/导入 JSON。
+最终交付是**一个零依赖的单 HTML 文件**——`npm run build` 后双击 `dist/index.html` 就能用，数据存在浏览器本地，可随时导出/导入 JSON。无后端、无账号、无网络请求。
 
-## 多 Goal 与数据存储
+<p align="center">
+  <img src="docs/screenshot-graph.png" alt="依赖关系图视图：把目标拆成一张 DAG，子节点指向父节点，颜色表示状态" width="100%">
+</p>
 
-- 工具栏左侧下拉可在多个 Goal（画布）间切换，`＋` 新建、`🗑` 删除，
-  标题输入框直接改名。「导入 JSON」会作为新 Goal 加入，不覆盖现有数据。
-- 数据默认存浏览器 localStorage（跟随"浏览器 + 页面来源"，
-  localhost 和 file:// 打开是两份数据）。
-- **「绑定数据目录」**（Chrome/Edge）：把 Goal 读写到 `goals/` 目录，
-  每个 Goal 一个 `<id>.json` 文件。在 localhost 和双击打开的页面分别
-  绑定同一个目录（本项目用 `/Users/zyma/Projects/taskmanagement/goals`），
-  即可共用一份数据；切回标签页时自动重载目录中的新改动。绑定状态
-  显示在工具栏（点击可解除）；浏览器重启后点一次「重新连接」恢复。
+<p align="center"><em>依赖关系图视图 —— 整个目标的拆解与依赖一目了然</em></p>
 
-## 使用
+<p align="center">
+  <img src="docs/screenshot-timeline.png" alt="时间线视图：同一份数据按截止日期沿时间轴排列" width="100%">
+</p>
+
+<p align="center"><em>时间线视图 —— 同一份数据按截止日期沿时间轴铺开，逾期任务标红</em></p>
+
+## 两个核心特点
+
+**① 图形化，给人看 —— 一张图就看懂全局**
+
+不是扁平的 todo 列表，而是把目标拆成一张依赖关系图：谁挡着谁、关键路径在哪、现在能动手的是哪几个，一眼就清楚。所有前序已完成的节点会**金色发光**，直接告诉你"现在可以开工的就是它"。配合分层自动布局、状态配色、折叠子树，复杂目标也能保持清爽。
+
+同一份数据还能切到**时间线视图**——按截止日期沿时间轴铺开，支持日 / 周 / 月与连续 / 紧凑两种刻度，逾期任务标红，适合盯排期。
+
+**② 结构化，给 AI 用 —— 定义了清晰的数据契约**
+
+每个 Goal 就是一份**带 schema 校验的 JSON**（`nodes` + `edges`，字段固定且文档化），落地为 `goals/<id>.json` 纯文本文件。这意味着：
+
+- **AI 工具（如 [OpenClaw](https://github.com/) 等 agent / 自动化脚本）可以直接读写这些 JSON 来增删任务、连依赖、改状态**，不需要点界面——人看图、AI 改数据，同一份文件双向同步。
+- **极易按需定制**：格式简单透明，无论是手写、脚本生成，还是接入自己的 LLM 流程，都只是在产出符合 schema 的 JSON。
+
+> 详见下方 [数据结构](#数据结构)。
+
+其余优点：**真·本地优先**（单文件、纯前端、数据在你手里）、**键盘流**（`Tab` 接后继、`Enter` 开并行，画图快过大纲笔记）。
+
+## 30 秒上手
 
 ```bash
 npm install
-npm run build      # 产出 dist/index.html
-npm test           # 单元测试 (Vitest)
-npm run test:e2e   # E2E (Playwright)
-npx serve src      # 开发模式（ESM 源码直跑）
+npm run build      # 产出 dist/index.html，双击即用
 ```
 
-更多当前态说明：
+想改源码 / 开发模式：
 
-- [功能说明](docs/features.md)
-- [技术架构](docs/architecture.md)
+```bash
+npm run watch      # 监听并重建
+npx serve src      # ESM 源码直跑，免构建
+npm test           # 单元测试 (Vitest)
+npm run test:e2e   # 端到端测试 (Playwright)
+```
 
-## 快捷键
+## 核心概念
+
+整张图是一个 **DAG（有向无环图）**：
+
+- **节点**按所在层级显示为 Goal（根）→ Project（直连 Goal）→ Task（更深层）。
+- **连线表示依赖**，方向固定为 `子节点/前序步骤 → 父节点/被实现的节点`；画布上箭头由子指向父，子节点排在父节点右侧。
+- 形成环的连线会被**拒绝并闪红**，保证图始终可拓扑执行。
+
+### 视觉语义
+
+| 表现 | 含义 |
+|---|---|
+| 灰 / 蓝 / 绿 | 待开始 / 进行中 / 已完成 |
+| **金色发光** | 所有前序已完成，**可以开始** |
+| 红色日期角标 | 截止日期已过且未完成 |
+
+## 操作
+
+### 键盘
 
 | 键 | 行为 |
 |---|---|
@@ -44,30 +78,71 @@ npx serve src      # 开发模式（ESM 源码直跑）
 | `Enter` | 创建并行任务（继承选中节点的所有前序） |
 | 双击 / `F2` | 编辑节点标题 |
 | `Space` | 切换状态：待开始 → 进行中 → 已完成 |
-| `D` | 展开/收起任务详情面板（描述、状态、工时、截止日期、前序列表） |
+| `D` | 展开/收起详情面板（描述、状态、工时、截止日期、前序列表） |
 | `Delete` | 删除节点（后续任务保留，仅断开依赖） |
-| 方向键 | 沿依赖线/同层移动选中 |
+| 方向键 | 沿依赖线 / 同层移动选中 |
 | `Esc` | 取消选中 / 取消编辑 |
 
-## 鼠标
+### 鼠标
 
-- 拖树内节点调整同父节点的上下顺序；双击空白创建的游离任务保留手动位置，连入图后回到自动排布
-- 从节点右侧圆点拖出连线建立依赖（循环依赖会被拒绝并闪红）
-- 右键点连线删除依赖；空白处拖拽平移，滚轮缩放，双击空白新建游离任务
-- 节点右上 `▾` 收起其前序步骤子树（实现该节点所需的步骤；`N▸` 显示折叠数量，再点展开）
+- 拖动树内节点调整同父节点下的上下顺序；双击空白创建的游离任务保留手动位置，连入图后回到自动排布。
+- 从节点右侧圆点拖出连线建立依赖（循环依赖会被拒绝并闪红）。
+- 右键点连线删除依赖；空白处拖拽平移，滚轮缩放。
+- 节点右上 `▾` 收起其前序子树（`N▸` 显示折叠数量，再点展开）。
 
-## 视觉语义
+## 多 Goal 与数据存储
 
-- 灰=待开始，蓝=进行中，绿=已完成
-- **金色发光 = 所有前序已完成、可以开始**
-- 截止日期过期且未完成的节点显示红色日期角标
+- 工具栏左侧下拉可在多个 Goal（画布）间切换，`＋` 新建、`🗑` 删除，标题输入框直接改名。「导入 JSON」会作为**新 Goal** 加入，不覆盖现有数据。
+- 默认存浏览器 **localStorage**，数据跟随"浏览器 + 页面来源"——`localhost` 和 `file://` 打开是两份独立数据。
+- **绑定数据目录**（Chrome / Edge）：把 Goal 读写到本地 `goals/` 目录，每个 Goal 一个 `<id>.json` 文件。让 `localhost` 与双击打开的页面绑定**同一个目录**即可共用数据；切回标签页时自动重载目录中的新改动。绑定状态显示在工具栏（点击可解除），浏览器重启后点一次「重新连接」即可恢复。
 
-## 结构
+## 数据结构
+
+每个 Goal 是一份独立 JSON，结构稳定、带运行时校验（见 `src/core/serialize.js`），适合人读、脚本写、AI 改：
+
+```jsonc
+{
+  "title": "上线 v1.0",
+  "edgeDirection": "child-to-parent",   // 固定：边由子节点指向父节点
+  "nodes": [
+    {
+      "id": "root",                     // 根节点 id 固定为 "root"
+      "type": "goal",                   // goal | project | task（按层级）
+      "title": "上线 v1.0",
+      "status": "todo",                 // todo | doing | done
+      "chainStatus": "active",          // active | paused
+      "description": "",
+      "estimatedHours": null,           // number | null
+      "deadline": null,                 // ISO 字符串 | null
+      "x": null, "y": null,             // 手动坐标，null 表示自动布局
+      "collapsed": false,
+      "detailOpen": false,
+      "fill": null, "stroke": null      // 自定义配色，null 用默认
+    }
+  ],
+  "edges": [
+    { "from": "<子节点/前序>", "to": "<父节点/被实现节点>" }
+  ]
+}
+```
+
+约束：必须存在 `id: "root"` 的 `goal` 节点；`edges` 构成的图必须无环；字段类型不符会被校验拒绝。AI 或脚本只要产出符合此结构的 JSON 写入 `goals/<id>.json`，界面即自动加载。
+
+## 文档
+
+- [功能说明](docs/features.md) —— 完整功能与交互细节
+- [技术架构](docs/architecture.md) —— 模块划分与设计取舍
+
+## 项目结构
 
 ```
-src/core/   纯函数：数据模型、图算法（环检测/折叠可见性/可开始判定）、
-            分层布局、schema/迁移、JSON 校验
-src/ui/     DOM/SVG 渲染、交互绑定、纯函数 command 层、浏览器存储
-scripts/    build.mjs 使用 esbuild bundle 后内联为 dist/index.html 单文件
-docs/plans/ 设计与实施文档
+src/core/    纯函数：数据模型、图算法（环检测 / 折叠可见性 / 可开始判定）、
+             分层布局、schema 与迁移、JSON 校验
+src/ui/      DOM/SVG 渲染、交互绑定、纯函数 command 层、浏览器存储
+scripts/     build.mjs 用 esbuild 打包后内联为 dist/index.html 单文件
+docs/        功能、架构与设计文档
 ```
+
+## 技术栈
+
+纯前端，无运行时依赖。构建用 [esbuild](https://esbuild.github.io/)，测试用 [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/)。
