@@ -1,23 +1,6 @@
-# tutask
+# tutask  用图看清楚任务的拆解和时间进度
 
-> 把一个目标，按"谁依赖谁"拆成一张可执行的依赖图。连线即依赖，整张图是一个 DAG，操作手感接近思维导图。
-> **既是给人看的可视化画布，也是给 AI 操作的结构化数据契约。**
-
-最终交付是**一个零依赖的单 HTML 文件**——`npm run build` 后双击 `dist/index.html` 就能用，数据存在浏览器本地，可随时导出/导入 JSON。无后端、无账号、无网络请求。
-
-<p align="center">
-  <img src="docs/screenshot-graph.png" alt="依赖关系图视图：把目标拆成一张 DAG，子节点指向父节点，颜色表示状态" width="100%">
-</p>
-
-<p align="center"><em>依赖关系图视图 —— 整个目标的拆解与依赖一目了然</em></p>
-
-<p align="center">
-  <img src="docs/screenshot-timeline.png" alt="时间线视图：同一份数据按截止日期沿时间轴排列" width="100%">
-</p>
-
-<p align="center"><em>时间线视图 —— 同一份数据按截止日期沿时间轴铺开，逾期任务标红</em></p>
-
-## 两个核心特点
+## 核心特点
 
 **① 图形化，给人看 —— 一张图就看懂全局**
 
@@ -32,7 +15,22 @@
 - **AI 工具（如 [OpenClaw](https://github.com/) 等 agent / 自动化脚本）可以直接读写这些 JSON 来增删任务、连依赖、改状态**，不需要点界面——人看图、AI 改数据，同一份文件双向同步。
 - **极易按需定制**：格式简单透明，无论是手写、脚本生成，还是接入自己的 LLM 流程，都只是在产出符合 schema 的 JSON。
 
-> 详见下方 [数据结构](#数据结构)。
+
+
+<p align="center">
+  <img src="docs/screenshot-graph.png" alt="依赖关系图视图：把目标拆成一张 DAG，子节点指向父节点，颜色表示状态" width="100%">
+</p>
+
+<p align="center"><em>依赖关系图视图 —— 整个目标的拆解与依赖一目了然</em></p>
+
+<p align="center">
+  <img src="docs/screenshot-timeline.png" alt="时间线视图：同一份数据按截止日期沿时间轴排列" width="100%">
+</p>
+
+<p align="center"><em>时间线视图 —— 同一份数据按截止日期沿时间轴铺开，逾期任务标红</em></p>
+
+
+
 
 其余优点：**真·本地优先**（单文件、纯前端、数据在你手里）、**键盘流**（`Tab` 接后继、`Enter` 开并行，画图快过大纲笔记）。
 
@@ -96,53 +94,9 @@ npm run test:e2e   # 端到端测试 (Playwright)
 - 默认存浏览器 **localStorage**，数据跟随"浏览器 + 页面来源"——`localhost` 和 `file://` 打开是两份独立数据。
 - **绑定数据目录**（Chrome / Edge）：把 Goal 读写到本地 `goals/` 目录，每个 Goal 一个 `<id>.json` 文件。让 `localhost` 与双击打开的页面绑定**同一个目录**即可共用数据；切回标签页时自动重载目录中的新改动。绑定状态显示在工具栏（点击可解除），浏览器重启后点一次「重新连接」即可恢复。
 
-## 数据结构
 
-每个 Goal 是一份独立 JSON，结构稳定、带运行时校验（见 `src/core/serialize.js`），适合人读、脚本写、AI 改：
-
-```jsonc
-{
-  "title": "上线 v1.0",
-  "edgeDirection": "child-to-parent",   // 固定：边由子节点指向父节点
-  "nodes": [
-    {
-      "id": "root",                     // 根节点 id 固定为 "root"
-      "type": "goal",                   // goal | project | task（按层级）
-      "title": "上线 v1.0",
-      "status": "todo",                 // todo | doing | done
-      "chainStatus": "active",          // active | paused
-      "description": "",
-      "estimatedHours": null,           // number | null
-      "deadline": null,                 // ISO 字符串 | null
-      "x": null, "y": null,             // 手动坐标，null 表示自动布局
-      "collapsed": false,
-      "detailOpen": false,
-      "fill": null, "stroke": null      // 自定义配色，null 用默认
-    }
-  ],
-  "edges": [
-    { "from": "<子节点/前序>", "to": "<父节点/被实现节点>" }
-  ]
-}
-```
-
-约束：必须存在 `id: "root"` 的 `goal` 节点；`edges` 构成的图必须无环；字段类型不符会被校验拒绝。AI 或脚本只要产出符合此结构的 JSON 写入 `goals/<id>.json`，界面即自动加载。
 
 ## 文档
 
 - [功能说明](docs/features.md) —— 完整功能与交互细节
 - [技术架构](docs/architecture.md) —— 模块划分与设计取舍
-
-## 项目结构
-
-```
-src/core/    纯函数：数据模型、图算法（环检测 / 折叠可见性 / 可开始判定）、
-             分层布局、schema 与迁移、JSON 校验
-src/ui/      DOM/SVG 渲染、交互绑定、纯函数 command 层、浏览器存储
-scripts/     build.mjs 用 esbuild 打包后内联为 dist/index.html 单文件
-docs/        功能、架构与设计文档
-```
-
-## 技术栈
-
-纯前端，无运行时依赖。构建用 [esbuild](https://esbuild.github.io/)，测试用 [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/)。
