@@ -1,102 +1,104 @@
-# tutask  用图看清楚任务的拆解和时间进度
+# tutask  see your tasks' breakdown and timeline at a glance
 
-## 核心特点
+<p align="right"><b>English</b> · <a href="README.zh-CN.md">中文</a></p>
 
-**① 图形化，给人看 —— 一张图就看懂全局**
+## Core features
 
-不是扁平的 todo 列表，而是把目标拆成一张依赖关系图：谁挡着谁、关键路径在哪、现在能动手的是哪几个，一眼就清楚。所有前序已完成的节点会**金色发光**，直接告诉你"现在可以开工的就是它"。配合分层自动布局、状态配色、折叠子树，复杂目标也能保持清爽。
+**① Visual, for humans — grasp the whole picture in one graph**
 
-同一份数据还能切到**时间线视图**——按截止日期沿时间轴铺开，支持日 / 周 / 月与连续 / 紧凑两种刻度，逾期任务标红，适合盯排期。
+Not a flat todo list, but your goal broken down into a dependency graph: what blocks what, where the critical path runs, and which items you can actually start right now — all obvious at a glance. Every node whose prerequisites are all done gets a **golden glow**, telling you exactly "this is what you can work on next." With automatic layered layout, status colors, and collapsible subtrees, even complex goals stay clean.
 
-**② 结构化，给 AI 用 —— 定义了清晰的数据契约**
+The same data can switch to a **timeline view** — laid out along a time axis by deadline, with day / week / month scales and continuous / compact spacing. Overdue tasks turn red, perfect for tracking schedules.
 
-每个 Goal 就是一份**带 schema 校验的 JSON**（`nodes` + `edges`，字段固定且文档化），落地为 `goals/<id>.json` 纯文本文件。这意味着：
+**② Structured, for AI — a well-defined data contract**
 
-- **AI 工具（如 [OpenClaw](https://github.com/) 等 agent / 自动化脚本）可以直接读写这些 JSON 来增删任务、连依赖、改状态**，不需要点界面——人看图、AI 改数据，同一份文件双向同步。
-- **极易按需定制**：格式简单透明，无论是手写、脚本生成，还是接入自己的 LLM 流程，都只是在产出符合 schema 的 JSON。
+Each Goal is a **schema-validated JSON** (`nodes` + `edges`, with fixed, documented fields), persisted as a plain `goals/<id>.json` file. This means:
+
+- **AI tools (agents / automation scripts such as [OpenClaw](https://github.com/)) can read and write these JSON files directly** to add tasks, wire up dependencies, and change status — no clicking through the UI. Humans read the graph, AI edits the data, both sync through the same file.
+- **Trivially customizable**: the format is simple and transparent. Whether you hand-write it, generate it with a script, or plug it into your own LLM pipeline, you're just producing JSON that conforms to the schema.
 
 
 
 <p align="center">
-  <img src="docs/screenshot-graph.png" alt="依赖关系图视图：把目标拆成一张 DAG，子节点指向父节点，颜色表示状态" width="100%">
+  <img src="docs/screenshot-graph.png" alt="Dependency graph view: a goal broken into a DAG, child nodes pointing to parents, colors showing status" width="100%">
 </p>
 
-<p align="center"><em>依赖关系图视图 —— 整个目标的拆解与依赖一目了然</em></p>
+<p align="center"><em>Dependency graph view — the full breakdown and dependencies of a goal at a glance</em></p>
 
 <p align="center">
-  <img src="docs/screenshot-timeline.png" alt="时间线视图：同一份数据按截止日期沿时间轴排列" width="100%">
+  <img src="docs/screenshot-timeline.png" alt="Timeline view: the same data arranged along a time axis by deadline" width="100%">
 </p>
 
-<p align="center"><em>时间线视图 —— 同一份数据按截止日期沿时间轴铺开，逾期任务标红</em></p>
+<p align="center"><em>Timeline view — the same data spread along a time axis by deadline, overdue tasks in red</em></p>
 
 
 
 
-其余优点：**真·本地优先**（单文件、纯前端、数据在你手里）、**键盘流**（`Tab` 接后继、`Enter` 开并行，画图快过大纲笔记）。
+Other perks: **truly local-first** (single file, pure front-end, your data stays with you) and **keyboard-driven** (`Tab` for a successor, `Enter` for a parallel task — graphing faster than outlining).
 
-## 30 秒上手
+## Get started in 30 seconds
 
 ```bash
 npm install
-npm run build      # 产出 dist/index.html，双击即用
+npm run build      # produces dist/index.html — just double-click it
 ```
 
-想改源码 / 开发模式：
+To hack on the source / dev mode:
 
 ```bash
-npm run watch      # 监听并重建
-npx serve src      # ESM 源码直跑，免构建
-npm test           # 单元测试 (Vitest)
-npm run test:e2e   # 端到端测试 (Playwright)
+npm run watch      # watch and rebuild
+npx serve src      # run ESM source directly, no build
+npm test           # unit tests (Vitest)
+npm run test:e2e   # end-to-end tests (Playwright)
 ```
 
-## 核心概念
+## Core concepts
 
-整张图是一个 **DAG（有向无环图）**：
+The whole thing is a **DAG (directed acyclic graph)**:
 
-- **节点**按所在层级显示为 Goal（根）→ Project（直连 Goal）→ Task（更深层）。
-- **连线表示依赖**，方向固定为 `子节点/前序步骤 → 父节点/被实现的节点`；画布上箭头由子指向父，子节点排在父节点右侧。
-- 形成环的连线会被**拒绝并闪红**，保证图始终可拓扑执行。
+- **Nodes** are displayed by their depth as Goal (root) → Project (directly under the Goal) → Task (deeper levels).
+- **Edges represent dependencies**, with a fixed direction: `child / prerequisite step → parent / the node it realizes`. On the canvas the arrow points from child to parent, and children sit to the right of their parent.
+- Any edge that would create a cycle is **rejected and flashes red**, so the graph always stays topologically executable.
 
-### 视觉语义
+### Visual semantics
 
-| 表现 | 含义 |
+| Appearance | Meaning |
 |---|---|
-| 灰 / 蓝 / 绿 | 待开始 / 进行中 / 已完成 |
-| **金色发光** | 所有前序已完成，**可以开始** |
-| 红色日期角标 | 截止日期已过且未完成 |
+| Gray / Blue / Green | Todo / In progress / Done |
+| **Golden glow** | All prerequisites done — **ready to start** |
+| Red date badge | Past deadline and not done |
 
-## 操作
+## Controls
 
-### 键盘
+### Keyboard
 
-| 键 | 行为 |
+| Key | Action |
 |---|---|
-| `Tab` | 在选中节点后创建后继任务（自动连依赖线） |
-| `Enter` | 创建并行任务（继承选中节点的所有前序） |
-| 双击 / `F2` | 编辑节点标题 |
-| `Space` | 切换状态：待开始 → 进行中 → 已完成 |
-| `D` | 展开/收起详情面板（描述、状态、工时、截止日期、前序列表） |
-| `Delete` | 删除节点（后续任务保留，仅断开依赖） |
-| 方向键 | 沿依赖线 / 同层移动选中 |
-| `Esc` | 取消选中 / 取消编辑 |
+| `Tab` | Create a successor task after the selected node (auto-links the dependency) |
+| `Enter` | Create a parallel task (inherits all prerequisites of the selected node) |
+| Double-click / `F2` | Edit node title |
+| `Space` | Cycle status: Todo → In progress → Done |
+| `D` | Toggle the detail panel (description, status, hours, deadline, prerequisite list) |
+| `Delete` | Delete the node (successors are kept, only dependencies are detached) |
+| Arrow keys | Move the selection along dependency edges / within the same level |
+| `Esc` | Cancel selection / cancel editing |
 
-### 鼠标
+### Mouse
 
-- 拖动树内节点调整同父节点下的上下顺序；双击空白创建的游离任务保留手动位置，连入图后回到自动排布。
-- 从节点右侧圆点拖出连线建立依赖（循环依赖会被拒绝并闪红）。
-- 右键点连线删除依赖；空白处拖拽平移，滚轮缩放。
-- 节点右上 `▾` 收起其前序子树（`N▸` 显示折叠数量，再点展开）。
+- Drag a node within the tree to reorder it among siblings; a free node created by double-clicking empty space keeps its manual position, and returns to auto-layout once wired into the graph.
+- Drag from the dot on a node's right edge to create a dependency (circular dependencies are rejected and flash red).
+- Right-click an edge to delete the dependency; drag on empty space to pan, scroll to zoom.
+- The `▾` at a node's top-right collapses its prerequisite subtree (`N▸` shows the collapsed count — click again to expand).
 
-## 多 Goal 与数据存储
+## Multiple Goals & data storage
 
-- 工具栏左侧下拉可在多个 Goal（画布）间切换，`＋` 新建、`🗑` 删除，标题输入框直接改名。「导入 JSON」会作为**新 Goal** 加入，不覆盖现有数据。
-- 默认存浏览器 **localStorage**，数据跟随"浏览器 + 页面来源"——`localhost` 和 `file://` 打开是两份独立数据。
-- **绑定数据目录**（Chrome / Edge）：把 Goal 读写到本地 `goals/` 目录，每个 Goal 一个 `<id>.json` 文件。让 `localhost` 与双击打开的页面绑定**同一个目录**即可共用数据；切回标签页时自动重载目录中的新改动。绑定状态显示在工具栏（点击可解除），浏览器重启后点一次「重新连接」即可恢复。
+- The dropdown on the left of the toolbar switches between Goals (canvases); `＋` creates, `🗑` deletes, and the title input renames. "Import JSON" adds the data as a **new Goal** without overwriting existing data.
+- Data is stored in the browser's **localStorage** by default, scoped to "browser + page origin" — opening via `localhost` and via `file://` are two independent copies.
+- **Bind a data directory** (Chrome / Edge): read/write Goals to a local `goals/` directory, one `<id>.json` file per Goal. Bind both the `localhost` page and the double-clicked page to the **same directory** to share data; switching back to the tab auto-reloads new changes from the directory. The bound state is shown in the toolbar (click to unbind); after a browser restart, click "Reconnect" once to restore it.
 
 
 
-## 文档
+## Documentation
 
-- [功能说明](docs/features.md) —— 完整功能与交互细节
-- [技术架构](docs/architecture.md) —— 模块划分与设计取舍
+- [Features](docs/features.md) — full feature and interaction details
+- [Architecture](docs/architecture.md) — module breakdown and design trade-offs
