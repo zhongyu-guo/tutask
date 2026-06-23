@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/icon-240.png" alt="tutask" width="112" height="112">
+
 # tutask
 
 **一张图，看清任务的拆解和时间进度。**

@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 512 512" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>tutask</title>
+<desc>A dependency graph: a green completed root node branches to a blue and a gray node, leading to a glowing golden node that signals the next task ready to start.</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#3730A3"/>
+<stop offset="1" stop-color="#1E1B4B"/>
+</linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#FCD34D"/>
+<stop offset="1" stop-color="#F59E0B"/>
+</linearGradient>
+</defs>
+
+<rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg)"/>
+<rect x="16.5" y="16.5" width="479" height="479" rx="107.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="1"/>
+
+<g stroke="#A5B4FC" stroke-opacity="0.55" stroke-width="7" stroke-linecap="round">
+<line x1="232" y1="168" x2="128" y2="252"/>
+<line x1="232" y1="344" x2="128" y2="268"/>
+<line x1="344" y1="252" x2="244" y2="174"/>
+<line x1="344" y1="268" x2="244" y2="338"/>
+</g>
+
+<circle cx="116" cy="260" r="33" fill="#34D399"/>
+<path d="M104 260 l9 9 l16 -17" fill="none" stroke="#064E3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+<circle cx="232" cy="168" r="29" fill="#60A5FA"/>
+<circle cx="232" cy="344" r="29" fill="#94A3B8"/>
+
+<circle cx="348" cy="260" r="82" fill="#FBBF24" fill-opacity="0.08"/>
+<circle cx="348" cy="260" r="64" fill="#FBBF24" fill-opacity="0.13"/>
+<circle cx="348" cy="260" r="48" fill="#FBBF24" fill-opacity="0.20"/>
+<circle cx="348" cy="260" r="38" fill="url(#gold)"/>
+<circle cx="348" cy="260" r="38" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="2"/>
+</svg>

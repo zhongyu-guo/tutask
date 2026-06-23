@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/icon-240.png" alt="tutask" width="112" height="112">
+
 # tutask
 
 **See your tasks' breakdown and timeline at a glance.**
