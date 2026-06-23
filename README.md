@@ -1,49 +1,35 @@
-# tutask  see your tasks' breakdown and timeline at a glance
+<div align="center">
 
-<p align="right"><b>English</b> · <a href="README.zh-CN.md">中文</a></p>
+# tutask
 
-## Core features
+**See your tasks' breakdown and timeline at a glance.**
 
-**① Visual, for humans — grasp the whole picture in one graph**
+A single-file, local-first task planner that turns a goal into a dependency graph — visual for humans, structured for AI.
 
-Not a flat todo list, but your goal broken down into a dependency graph: what blocks what, where the critical path runs, and which items you can actually start right now — all obvious at a glance. Every node whose prerequisites are all done gets a **golden glow**, telling you exactly "this is what you can work on next." With automatic layered layout, status colors, and collapsible subtrees, even complex goals stay clean.
+English · [中文](README.zh-CN.md)
 
-The same data can switch to a **timeline view** — laid out along a time axis by deadline, with day / week / month scales and continuous / compact spacing. Overdue tasks turn red, perfect for tracking schedules.
+![dependency graph view](docs/screenshot-graph.png)
 
-**② Structured, for AI — a well-defined data contract**
+</div>
 
-Each Goal is a **schema-validated JSON** (`nodes` + `edges`, with fixed, documented fields), persisted as a plain `goals/<id>.json` file. This means:
+---
 
-- **AI tools (agents / automation scripts such as [OpenClaw](https://github.com/)) can read and write these JSON files directly** to add tasks, wire up dependencies, and change status — no clicking through the UI. Humans read the graph, AI edits the data, both sync through the same file.
-- **Trivially customizable**: the format is simple and transparent. Whether you hand-write it, generate it with a script, or plug it into your own LLM pipeline, you're just producing JSON that conforms to the schema.
+## Why tutask
 
+- **🕸️ A dependency graph, not a flat list** — see what blocks what, where the critical path runs, and which tasks you can start right now. Nodes whose prerequisites are all done get a **golden glow**.
+- **📅 Two views, one dataset** — flip between the graph and a **timeline** laid out by deadline (day / week / month scales). Overdue tasks turn red.
+- **🤖 A clean data contract for AI** — every goal is a schema-validated `goals/<id>.json` file. Agents and scripts can read/write tasks directly, no UI clicking. Humans read the graph, AI edits the data.
+- **📦 Truly local-first** — builds to one zero-dependency `dist/index.html`. No backend, no account, no network. Your data stays with you.
+- **⌨️ Keyboard-driven** — `Tab` for a successor, `Enter` for a parallel task. Graphing as fast as outlining.
 
-
-<p align="center">
-  <img src="docs/screenshot-graph.png" alt="Dependency graph view: a goal broken into a DAG, child nodes pointing to parents, colors showing status" width="100%">
-</p>
-
-<p align="center"><em>Dependency graph view — the full breakdown and dependencies of a goal at a glance</em></p>
-
-<p align="center">
-  <img src="docs/screenshot-timeline.png" alt="Timeline view: the same data arranged along a time axis by deadline" width="100%">
-</p>
-
-<p align="center"><em>Timeline view — the same data spread along a time axis by deadline, overdue tasks in red</em></p>
-
-
-
-
-Other perks: **truly local-first** (single file, pure front-end, your data stays with you) and **keyboard-driven** (`Tab` for a successor, `Enter` for a parallel task — graphing faster than outlining).
-
-## Get started in 30 seconds
+## Quick start
 
 ```bash
 npm install
 npm run build      # produces dist/index.html — just double-click it
 ```
 
-To hack on the source / dev mode:
+Dev mode:
 
 ```bash
 npm run watch      # watch and rebuild
@@ -52,12 +38,22 @@ npm test           # unit tests (Vitest)
 npm run test:e2e   # end-to-end tests (Playwright)
 ```
 
+## Timeline view
+
+<div align="center">
+
+![timeline view](docs/screenshot-timeline.png)
+
+*The same data spread along a time axis by deadline — overdue tasks in red.*
+
+</div>
+
 ## Core concepts
 
 The whole thing is a **DAG (directed acyclic graph)**:
 
-- **Nodes** are displayed by their depth as Goal (root) → Project (directly under the Goal) → Task (deeper levels).
-- **Edges represent dependencies**, with a fixed direction: `child / prerequisite step → parent / the node it realizes`. On the canvas the arrow points from child to parent, and children sit to the right of their parent.
+- **Nodes** are shown by depth as Goal (root) → Project (directly under the goal) → Task (deeper levels).
+- **Edges are dependencies**, with a fixed direction: `child / prerequisite → parent / the node it realizes`. Arrows point child → parent, and children sit to the right of their parent.
 - Any edge that would create a cycle is **rejected and flashes red**, so the graph always stays topologically executable.
 
 ### Visual semantics
@@ -78,27 +74,29 @@ The whole thing is a **DAG (directed acyclic graph)**:
 | `Enter` | Create a parallel task (inherits all prerequisites of the selected node) |
 | Double-click / `F2` | Edit node title |
 | `Space` | Cycle status: Todo → In progress → Done |
-| `D` | Toggle the detail panel (description, status, hours, deadline, prerequisite list) |
+| `D` | Toggle the detail panel (description, status, hours, deadline, prerequisites) |
 | `Delete` | Delete the node (successors are kept, only dependencies are detached) |
-| Arrow keys | Move the selection along dependency edges / within the same level |
+| Arrow keys | Move the selection along edges / within the same level |
 | `Esc` | Cancel selection / cancel editing |
 
 ### Mouse
 
-- Drag a node within the tree to reorder it among siblings; a free node created by double-clicking empty space keeps its manual position, and returns to auto-layout once wired into the graph.
-- Drag from the dot on a node's right edge to create a dependency (circular dependencies are rejected and flash red).
-- Right-click an edge to delete the dependency; drag on empty space to pan, scroll to zoom.
-- The `▾` at a node's top-right collapses its prerequisite subtree (`N▸` shows the collapsed count — click again to expand).
+- Drag a node within the tree to reorder it among siblings; a free node created by double-clicking empty space keeps its manual position, returning to auto-layout once wired into the graph.
+- Drag from the dot on a node's right edge to create a dependency (cycles are rejected and flash red).
+- Right-click an edge to delete the dependency; drag empty space to pan, scroll to zoom.
+- The `▾` at a node's top-right collapses its prerequisite subtree (`N▸` shows the collapsed count — click to expand).
 
-## Multiple Goals & data storage
+## Multiple goals & data storage
 
-- The dropdown on the left of the toolbar switches between Goals (canvases); `＋` creates, `🗑` deletes, and the title input renames. "Import JSON" adds the data as a **new Goal** without overwriting existing data.
-- Data is stored in the browser's **localStorage** by default, scoped to "browser + page origin" — opening via `localhost` and via `file://` are two independent copies.
-- **Bind a data directory** (Chrome / Edge): read/write Goals to a local `goals/` directory, one `<id>.json` file per Goal. Bind both the `localhost` page and the double-clicked page to the **same directory** to share data; switching back to the tab auto-reloads new changes from the directory. The bound state is shown in the toolbar (click to unbind); after a browser restart, click "Reconnect" once to restore it.
-
-
+- The dropdown on the left of the toolbar switches between goals (canvases); `＋` creates, `🗑` deletes, the title input renames. "Import JSON" adds data as a **new goal** without overwriting existing data.
+- Data lives in the browser's **localStorage** by default, scoped to "browser + page origin" — `localhost` and `file://` are two independent copies.
+- **Bind a data directory** (Chrome / Edge): read/write goals to a local `goals/` directory, one `<id>.json` per goal. Bind both the `localhost` and the double-clicked page to the **same directory** to share data; switching back to the tab auto-reloads changes. The bound state shows in the toolbar (click to unbind); after a browser restart, click "Reconnect" once to restore it.
 
 ## Documentation
 
 - [Features](docs/features.md) — full feature and interaction details
 - [Architecture](docs/architecture.md) — module breakdown and design trade-offs
+
+## Tech stack
+
+Pure front-end, zero runtime dependencies. Built with [esbuild](https://esbuild.github.io/), tested with [Vitest](https://vitest.dev/) and [Playwright](https://playwright.dev/).
